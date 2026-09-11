@@ -196,7 +196,7 @@ class HttpTransportTest {
         } catch (e: IOException) {
             assertTrue(
                 "message mentions redirect budget: ${e.message}",
-                e.message ?: "".contains("Too many redirects"),
+                (e.message ?: "").contains("Too many redirects"),
             )
         }
     }
