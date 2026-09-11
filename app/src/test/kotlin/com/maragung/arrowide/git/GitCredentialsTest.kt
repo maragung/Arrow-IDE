@@ -9,8 +9,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.PosixFilePermission
 
 /** Plan #38: temporary askpass scripts, 0700, always deleted. */
 class GitCredentialsTest {
@@ -57,18 +55,17 @@ class GitCredentialsTest {
         try {
             assertTrue(script.file.isFile)
             assertTrue("must be executable", script.file.canExecute())
-            try {
-                assertEquals(
-                    setOf(
-                        PosixFilePermission.OWNER_READ,
-                        PosixFilePermission.OWNER_WRITE,
-                        PosixFilePermission.OWNER_EXECUTE,
-                    ),
-                    Files.getPosixFilePermissions(script.file.toPath()),
-                )
-            } catch (e: UnsupportedOperationException) {
-                // Non-POSIX filesystem; the canExecute check above covered it.
-            }
+            // Mode check via coreutils stat: java.nio.file.attribute's POSIX
+            // types are hidden in android.jar, so they cannot be referenced
+            // from unit-test sources. stat is present on the CI runners and
+            // dev machines; where it is missing the owner-bit checks above
+            // still apply.
+            val mode = runCatching {
+                ProcessBuilder("stat", "-c", "%a", script.file.absolutePath)
+                    .start()
+                    .inputStream.bufferedReader().readText().trim()
+            }.getOrNull()
+            assertEquals("700", mode)
             assertEquals(
                 AskpassScript.scriptContent(GitCredentials("alice", "secret")),
                 script.file.readText(),

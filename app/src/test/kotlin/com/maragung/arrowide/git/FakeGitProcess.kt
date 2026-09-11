@@ -48,7 +48,7 @@ class FakeGitProcess(
         extraEnv: Map<String, String>,
         stdin: ByteArray?,
     ): GitProcessResult {
-        val call = Call(args.toList(), cwd, extraEnv.toMap(), stdin?.copy())
+        val call = Call(args.toList(), cwd, extraEnv.toMap(), stdin?.copyOf())
         val result: GitProcessResult = synchronized(lock) {
             calls += call
             failure?.let { throw it }
