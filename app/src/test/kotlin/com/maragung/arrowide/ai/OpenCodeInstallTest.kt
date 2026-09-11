@@ -184,7 +184,7 @@ class OpenCodeInstallTest {
         val progress = service.installProgress.value
         assertEquals(OpenCodeInstallState.INSTALLED, progress.state)
         assertEquals(1f, progress.progress)
-        assertTrue(progress.message.contains("v0.6.5"))
+        assertTrue(progress.message?.contains("v0.6.5") == true)
     }
 
     @Test
