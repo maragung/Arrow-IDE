@@ -65,13 +65,13 @@ class MainActivity : ComponentActivity() {
         @Volatile
         private var cachedContainer: ArrowAppContainer? = null
 
-        private fun obtainContainer(appContext: Context): Pair<ArrowAppContainer, Boolean> {
+        private fun obtainContainer(appContext: Context): ArrowAppContainer {
             val existing = cachedContainer
-            if (existing != null) return existing to false
+            if (existing != null) return existing
             val created = ArrowAppContainer(appContext)
             restoreEditorBuffers(created)
             cachedContainer = created
-            return created to true
+            return created
         }
 
         /**

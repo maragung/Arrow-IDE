@@ -3,7 +3,6 @@ package com.maragung.arrowide.terminal
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.channels.sendBlocking
 import java.io.IOException
 import kotlin.concurrent.thread
 
@@ -69,7 +68,6 @@ class UnixPtyProcess(
 
     companion object {
         private const val READ_CHUNK_BYTES = 8192
-        private const val OUTPUT_BUFFER_CHUNKS = 512
 
         /** POSIX signal numbers (bionic values). */
         private const val SIGHUP = 1
@@ -79,7 +77,13 @@ class UnixPtyProcess(
     private val masterFd: Int
     override val pid: Long
 
-    private val outputChannel = Channel<ByteArray>(capacity = OUTPUT_BUFFER_CHUNKS)
+    /**
+     * Unbounded so the reader thread (plain thread, not a coroutine) can
+     * hand over chunks with non-blocking [Channel.trySend] without ever
+     * dropping terminal output; the consumer drains quickly and the reader
+     * stops at EOF/EIO anyway.
+     */
+    private val outputChannel = Channel<ByteArray>(capacity = Channel.UNLIMITED)
     override val onOutput: ReceiveChannel<ByteArray> = outputChannel
 
     override val onExit = CompletableDeferred<Int>()
@@ -162,7 +166,11 @@ class UnixPtyProcess(
                     // 0 = EOF, -1 = error (EIO once the child side is gone).
                     break
                 }
-                outputChannel.sendBlocking(buffer.copyOf(n))
+                val result = outputChannel.trySend(buffer.copyOf(n))
+                if (result.isClosed) {
+                    // Consumer went away; stop reading and release the fd.
+                    break
+                }
             }
         } catch (t: Throwable) {
             // The consumer went away (channel closed) or the fd broke.

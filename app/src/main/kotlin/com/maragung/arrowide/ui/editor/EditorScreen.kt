@@ -295,10 +295,11 @@ fun EditorScreen(
                         }
                         subscribeEvent(SelectionChangeEvent::class.java) { _, _ ->
                             val tabId = holder.activeTabId ?: return@subscribeEvent
-                            val left = cursor.left
-                            tabManager.updateCursor(tabId, left.line, left.column)
-                            cursorLine = left.line
-                            cursorColumn = left.column
+                            val line = cursor.leftLine
+                            val column = cursor.leftColumn
+                            tabManager.updateCursor(tabId, line, column)
+                            cursorLine = line
+                            cursorColumn = column
                         }
 
                         holder.editor = this

@@ -24,14 +24,14 @@ class ArrowTerminalView(
     metrics: DisplayMetrics,
 ) : EmulatorView(context, session, metrics) {
 
-    override fun onSingleTapUp(e: MotionEvent?): Boolean {
+    override fun onSingleTapUp(e: MotionEvent): Boolean {
         val handled = super.onSingleTapUp(e)
         requestFocus()
         showSoftInput()
         return handled
     }
 
-    override fun onLongPress(e: MotionEvent?) {
+    override fun onLongPress(e: MotionEvent) {
         toggleSelectingText()
     }
 
