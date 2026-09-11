@@ -133,3 +133,28 @@ they are listed here only to distinguish them from vendored material.
   files were stripped of JSONC comments/trailing commas (string-aware,
   zero semantic change) because the grammar loader requires strict JSON.
 
+
+## XZ for Java
+
+- **Project:** https://tukaani.org/xz/java.html
+  (source: https://github.com/tukaani-project/xz-java)
+- **Version:** 1.9 (consumed as a binary dependency from Maven Central —
+  not vendored, not modified)
+- **License:** Public Domain (0-Clause)
+  (https://github.com/tukaani-project/xz-java/blob/master/LICENSE)
+- **Artifact used:** `org.tukaani:xz` (via Apache commons-compress's XZ
+  support for `.deb` payload decompression)
+- **Notes:** consumed as an unmodified library dependency via Gradle.
+
+## Apache Commons Compress
+
+- **Project:** https://commons.apache.org/proper/commons-compress/
+- **Version:** 1.26.2 (consumed as a binary dependency from Maven Central —
+  not vendored, not modified)
+- **License:** Apache License 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)
+- **Artifact used:** `org.apache.commons:commons-compress` (ar + tar
+  handling for `.deb` package extraction, XZ compressor streams)
+- **Notes:** consumed as an unmodified library dependency via Gradle. It
+  pulls in `commons-io`, `commons-lang3` and `commons-codec` transitively,
+  also unmodified.

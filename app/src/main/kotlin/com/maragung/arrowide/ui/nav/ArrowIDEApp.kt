@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
@@ -41,6 +42,7 @@ import com.maragung.arrowide.ui.explorer.ExplorerScreen
 import com.maragung.arrowide.ui.home.HomeScreen
 import com.maragung.arrowide.ui.settings.SettingsScreen
 import com.maragung.arrowide.ui.terminal.TerminalScreen
+import com.maragung.arrowide.ui.tools.ToolsScreen
 
 private data class TopDestination(
     val route: String,
@@ -53,6 +55,7 @@ private val destinations = listOf(
     TopDestination("explorer", "Explorer", Icons.Filled.FolderOpen),
     TopDestination("editor", "Editor", Icons.Filled.Code),
     TopDestination("terminal", "Terminal", Icons.Filled.Terminal),
+    TopDestination("tools", "Tools", Icons.Filled.Build),
     TopDestination("settings", "Settings", Icons.Filled.Settings)
 )
 
@@ -61,8 +64,9 @@ private val destinations = listOf(
  *
  * Adaptive navigation (plan #41): on wide screens (>= 840dp) a permanent
  * [NavigationRail] sits on the left (tablet layout); on narrower screens a
- * [NavigationBar] sits at the bottom (phone layout). Either way the same five
- * destinations are reachable: Home, Explorer, Editor, Terminal, Settings.
+ * [NavigationBar] sits at the bottom (phone layout). Either way the same six
+ * destinations are reachable: Home, Explorer, Editor, Terminal, Tools,
+ * Settings.
  *
  * Editor and Terminal route to their real subsystem screens
  * ([com.maragung.arrowide.ui.editor.EditorScreen],
@@ -186,6 +190,9 @@ fun ArrowIDEApp(
                             maxSessions = settings.maxTerminalSessions,
                             fontSizeDp = settings.terminalFontSize
                         )
+                    }
+                    composable("tools") {
+                        ToolsScreen(manager = container.toolchainManager)
                     }
                     composable("settings") {
                         SettingsScreen(store = container.settingsStore)
