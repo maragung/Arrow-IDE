@@ -2,8 +2,6 @@ package com.maragung.arrowide.git
 
 import java.io.File
 import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.PosixFilePermissions
 import java.util.UUID
 
 /**
@@ -111,21 +109,23 @@ class AskpassScript private constructor(val file: File) {
                 throw IOException("Cannot create askpass cache dir: $cacheDir")
             }
             val file = File(cacheDir, "git-askpass-${UUID.randomUUID()}.sh")
-            val path = file.toPath()
+            // java.nio PosixFilePermissions is unavailable on Android, so the
+            // script is created via java.io and restricted to the owner with
+            // the File permission setters (0700 equivalent).
             try {
-                // Born with 0700 on POSIX filesystems.
-                val attrs = PosixFilePermissions.asFileAttribute(
-                    PosixFilePermissions.fromString("rwx------"),
-                )
-                Files.createFile(path, attrs)
-                Files.write(path, scriptContent(credentials).toByteArray(Charsets.UTF_8))
-            } catch (e: UnsupportedOperationException) {
-                // Non-POSIX filesystem: restrict via java.io.File setters.
-                file.createNewFile()
+                if (!file.createNewFile()) {
+                    throw IOException("Askpass script already exists: $file")
+                }
                 file.writeText(scriptContent(credentials), Charsets.UTF_8)
+                file.setReadable(false, false)
+                file.setWritable(false, false)
+                file.setExecutable(false, false)
                 file.setReadable(true, true)
                 file.setWritable(true, true)
                 file.setExecutable(true, true)
+            } catch (e: IOException) {
+                file.delete()
+                throw e
             }
             return AskpassScript(file)
         }

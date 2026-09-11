@@ -51,9 +51,14 @@ class SettingsStore(private val context: Context) {
             preferences[SCROLLBACK_LINES] = updated.scrollbackLines
             preferences[MAX_TERMINAL_SESSIONS] = updated.maxTerminalSessions
             preferences[SESSION_LIMIT_WARN] = updated.sessionLimitWarn
-            // Blank means "unset" — persisted as absent keys.
-            preferences[GIT_USER_NAME] = updated.gitUserName?.takeIf { it.isNotBlank() }
-            preferences[GIT_USER_EMAIL] = updated.gitUserEmail?.takeIf { it.isNotBlank() }
+            // Blank means "unset" — persisted as absent keys (Preferences
+            // DataStore values are non-null).
+            val gitName = updated.gitUserName?.takeIf { it.isNotBlank() }
+            if (gitName != null) preferences[GIT_USER_NAME] = gitName
+            else preferences.remove(GIT_USER_NAME)
+            val gitEmail = updated.gitUserEmail?.takeIf { it.isNotBlank() }
+            if (gitEmail != null) preferences[GIT_USER_EMAIL] = gitEmail
+            else preferences.remove(GIT_USER_EMAIL)
         }
     }
 

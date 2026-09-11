@@ -194,7 +194,7 @@ class AndroidGitProcess(
     /** Reads [stream] fully into [bytes] on a daemon thread. */
     private fun drain(stream: InputStream): Drain {
         val drain = Drain()
-        Thread {
+        val thread = Thread {
             try {
                 val buffer = ByteArray(8192)
                 while (true) {
@@ -205,11 +205,19 @@ class AndroidGitProcess(
             } catch (e: IOException) {
                 // Stream closed underneath us; keep what was read.
             }
-        }.apply { isDaemon = true }.start()
+        }
+        thread.isDaemon = true
+        thread.start()
+        drain.thread = thread
         return drain
     }
 
     private class Drain {
         val bytes = ByteArrayOutputStream()
+        lateinit var thread: Thread
+
+        fun join() {
+            if (this::thread.isInitialized) thread.join()
+        }
     }
 }
