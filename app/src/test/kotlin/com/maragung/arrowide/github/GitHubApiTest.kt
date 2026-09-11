@@ -27,7 +27,7 @@ class GitHubApiTest {
     }
 
     private fun bodyOf(request: HttpExchange): String =
-        String(request.requestBody.orEmpty(), Charsets.UTF_8)
+        String(request.requestBody ?: ByteArray(0), Charsets.UTF_8)
 
     // ---- pagination helper ------------------------------------------------
 

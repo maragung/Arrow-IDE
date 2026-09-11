@@ -212,7 +212,7 @@ class GitHubServiceTest {
         assertEquals("octocat", repo.ownerLogin)
         assertEquals(
             "{\"name\":\"demo\",\"private\":false}",
-            String(fake.requests.single().requestBody.orEmpty(), Charsets.UTF_8),
+            String(fake.requests.single().requestBody ?: ByteArray(0), Charsets.UTF_8),
         )
     }
 
@@ -263,7 +263,7 @@ class GitHubServiceTest {
         assertTrue(result is GitHubResult.Ok)
         assertEquals(
             "{\"ref\":\"main\",\"inputs\":{\"environment\":\"staging\"}}",
-            String(fake.requests.single().requestBody.orEmpty(), Charsets.UTF_8),
+            String(fake.requests.single().requestBody ?: ByteArray(0), Charsets.UTF_8),
         )
     }
 

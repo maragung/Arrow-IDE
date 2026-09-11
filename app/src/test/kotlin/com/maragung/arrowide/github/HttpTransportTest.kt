@@ -134,7 +134,7 @@ class HttpTransportTest {
         assertEquals("POST", fake.requests[1].method)
         assertEquals(
             "payload",
-            String(fake.requests[1].requestBody.orEmpty(), Charsets.UTF_8),
+            String(fake.requests[1].requestBody ?: ByteArray(0), Charsets.UTF_8),
         )
     }
 
@@ -196,7 +196,7 @@ class HttpTransportTest {
         } catch (e: IOException) {
             assertTrue(
                 "message mentions redirect budget: ${e.message}",
-                e.message.orEmpty().contains("Too many redirects"),
+                e.message ?: "".contains("Too many redirects"),
             )
         }
     }
