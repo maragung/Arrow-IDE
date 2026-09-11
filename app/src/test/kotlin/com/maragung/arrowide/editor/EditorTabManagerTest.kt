@@ -42,7 +42,12 @@ class EditorTabManagerTest {
     @Test
     fun openFile_dedupesByCanonicalPath() {
         val m = manager()
-        val file = newFile("dir/../a.txt")
+        // The "dir" component must really exist: on JDK 17 File.mkdirs()
+        // canonicalizes "dir/.." away, so newFile() would not create it and
+        // writing through the ".."-path would fail with ENOENT.
+        File(tmp.root, "dir").mkdirs()
+        val file = File(tmp.root, "dir/../a.txt")
+        file.writeText("content of a.txt")
         val sameFile = File(file.canonicalPath)
 
         val first = m.openFile(file)

@@ -75,10 +75,15 @@ class TerminalSessionTest {
             session.write('c'.code)
             assertArrayEquals(byteArrayOf(3), process.written.single())
 
-            // The modifier is consumed by the next key press.
+            // The modifier is consumed by the next key press, whichever
+            // write path it takes: an IME-style string write maps only its
+            // first character (soft keyboard: Ctrl, then type 'x' => ^X)...
             session.setCtrlModifier(true)
-            session.write("x")
-            assertEquals("x", process.writtenAsString().substring(1))
+            session.write("xc")
+            assertEquals("c", process.writtenAsString().substring(1))
+            // ...and a following plain key press goes through unmapped.
+            session.write('y'.code)
+            assertEquals("cy", process.writtenAsString().substring(1))
         } finally {
             session.close()
         }
