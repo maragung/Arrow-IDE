@@ -148,7 +148,9 @@ class GitHubServiceTest {
     fun httpError_includesBodyMessage() = runBlocking {
         store.set(token)
         fake.route(
-            "https://api.github.com/repos/octocat/gone",
+            // listBranches asks /branches?per_page=100 — route that path
+            // (FakeTransport matches path-only routes with query strings).
+            "https://api.github.com/repos/octocat/gone/branches",
             jsonResponse(404, "{\"message\":\"Not Found\"}"),
         )
 

@@ -260,7 +260,8 @@ class GitHubApiTest {
 
         val error = result as GitHubApiResult.HttpError
         assertEquals(403, error.statusCode)
-        assertEquals("Must have admin rights", error.bodyText)
+        // HttpError carries the RAW body; the facade extracts the message.
+        assertEquals("{\"message\":\"Must have admin rights\"}", error.bodyText)
     }
 
     // ---- Actions -----------------------------------------------------------
@@ -493,7 +494,8 @@ class GitHubApiTest {
 
         val error = result as GitHubApiResult.HttpError
         assertEquals(401, error.statusCode)
-        assertEquals("Bad credentials", error.bodyText)
+        // HttpError carries the RAW body; the facade extracts the message.
+        assertEquals("{\"message\":\"Bad credentials\"}", error.bodyText)
     }
 
     @Test
