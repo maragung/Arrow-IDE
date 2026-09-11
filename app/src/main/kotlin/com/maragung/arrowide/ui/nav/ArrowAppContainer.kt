@@ -2,6 +2,7 @@ package com.maragung.arrowide.ui.nav
 
 import android.content.Context
 import android.os.Build
+import com.maragung.arrowide.ai.OpenCodeService
 import com.maragung.arrowide.buildsystem.BuildSystemDetector
 import com.maragung.arrowide.buildsystem.ProjectEnvironment
 import com.maragung.arrowide.data.SettingsStore
@@ -108,6 +109,26 @@ class ArrowAppContainer(context: Context) {
 
     /** Build-system detection (plan #24): marker files → real commands. */
     val buildSystemDetector: BuildSystemDetector = BuildSystemDetector()
+
+    /**
+     * AI coding agent (plan #51+): the real OpenCode binary (static musl
+     * build for the device ABI) installed into the shared toolchain prefix
+     * so it is on every shell's PATH, run as a local `opencode serve`
+     * process and driven over its HTTP API. HOME matches the terminal's
+     * home; the server is restarted in the open workspace so the agent
+     * works on the current project.
+     */
+    val openCodeService: OpenCodeService = OpenCodeService(
+        transport = HttpUrlConnectionTransport(),
+        binaryDir = File(context.filesDir, "usr/bin"),
+        homeDir = File(context.filesDir, "home"),
+        cacheDir = File(context.cacheDir, "opencode"),
+        archAssetSuffix = if (Build.SUPPORTED_ABIS.firstOrNull() == "x86_64") {
+            "x64-musl"
+        } else {
+            "arm64-musl"
+        }
+    )
 
     /** Project environment (plan #22): .env parsing + secret heuristics. */
     val projectEnvironment: ProjectEnvironment = ProjectEnvironment()
