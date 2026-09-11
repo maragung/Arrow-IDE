@@ -13,14 +13,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Hammer
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
@@ -39,6 +40,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +55,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.git.GitOutcome
+import com.maragung.arrowide.ui.ai.AiScreen
 import com.maragung.arrowide.ui.build.BuildScreen
 import com.maragung.arrowide.ui.editor.EditorScreen
 import com.maragung.arrowide.ui.explorer.ExplorerScreen
@@ -79,7 +82,8 @@ private val destinations = listOf(
     TopDestination("terminal", "Terminal", Icons.Filled.Terminal),
     TopDestination("scm", "Git", Icons.Filled.CallSplit),
     TopDestination("github", "GitHub", Icons.Filled.Public),
-    TopDestination("build", "Build", Icons.Filled.Hammer),
+    TopDestination("ai", "AI", Icons.Filled.AutoAwesome),
+    TopDestination("build", "Build", Icons.Filled.PlayArrow),
     TopDestination("templates", "Templates", Icons.Filled.CreateNewFolder),
     TopDestination("tools", "Tools", Icons.Filled.Build),
     TopDestination("settings", "Settings", Icons.Filled.Settings)
@@ -304,6 +308,13 @@ fun ArrowIDEApp(
                                 outcome is GitOutcome.Ok
                             }
                         )
+                    }
+                    composable("ai") {
+                        // AI coding agent (plan #51+): real OpenCode binary
+                        // served locally; the agent works on the open workspace.
+                        val workspace by container.workspaceManager.currentWorkspace
+                            .collectAsState()
+                        AiScreen(ai = container.openCodeService, workspace = workspace)
                     }
                     composable("build") {
                         // Build & one-tap actions (plan #24 + #33): commands
