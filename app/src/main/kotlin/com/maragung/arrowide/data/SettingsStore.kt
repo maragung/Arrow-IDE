@@ -29,7 +29,10 @@ class SettingsStore(private val context: Context) {
         val terminalFontSize: Int = 12,
         val scrollbackLines: Int = 5000,
         val maxTerminalSessions: Int = 5,
-        val sessionLimitWarn: Boolean = true
+        val sessionLimitWarn: Boolean = true,
+        /** Git commit identity (plan #10); nulls fall back to ~/.gitconfig. */
+        val gitUserName: String? = null,
+        val gitUserEmail: String? = null
     )
 
     val settings: Flow<AppSettings> = context.arrowDataStore.data
@@ -48,6 +51,9 @@ class SettingsStore(private val context: Context) {
             preferences[SCROLLBACK_LINES] = updated.scrollbackLines
             preferences[MAX_TERMINAL_SESSIONS] = updated.maxTerminalSessions
             preferences[SESSION_LIMIT_WARN] = updated.sessionLimitWarn
+            // Blank means "unset" — persisted as absent keys.
+            preferences[GIT_USER_NAME] = updated.gitUserName?.takeIf { it.isNotBlank() }
+            preferences[GIT_USER_EMAIL] = updated.gitUserEmail?.takeIf { it.isNotBlank() }
         }
     }
 
@@ -60,7 +66,9 @@ class SettingsStore(private val context: Context) {
             terminalFontSize = this[TERMINAL_FONT_SIZE] ?: 12,
             scrollbackLines = this[SCROLLBACK_LINES] ?: 5000,
             maxTerminalSessions = this[MAX_TERMINAL_SESSIONS] ?: 5,
-            sessionLimitWarn = this[SESSION_LIMIT_WARN] ?: true
+            sessionLimitWarn = this[SESSION_LIMIT_WARN] ?: true,
+            gitUserName = this[GIT_USER_NAME]?.takeIf { it.isNotBlank() },
+            gitUserEmail = this[GIT_USER_EMAIL]?.takeIf { it.isNotBlank() }
         )
 
     private companion object {
@@ -70,5 +78,7 @@ class SettingsStore(private val context: Context) {
         val SCROLLBACK_LINES = intPreferencesKey("scrollback_lines")
         val MAX_TERMINAL_SESSIONS = intPreferencesKey("max_terminal_sessions")
         val SESSION_LIMIT_WARN = booleanPreferencesKey("session_limit_warn")
+        val GIT_USER_NAME = stringPreferencesKey("git_user_name")
+        val GIT_USER_EMAIL = stringPreferencesKey("git_user_email")
     }
 }

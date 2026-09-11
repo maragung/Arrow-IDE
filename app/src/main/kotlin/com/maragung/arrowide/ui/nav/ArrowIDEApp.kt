@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
@@ -40,6 +41,7 @@ import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.ui.editor.EditorScreen
 import com.maragung.arrowide.ui.explorer.ExplorerScreen
 import com.maragung.arrowide.ui.home.HomeScreen
+import com.maragung.arrowide.ui.scm.SourceControlScreen
 import com.maragung.arrowide.ui.settings.SettingsScreen
 import com.maragung.arrowide.ui.terminal.TerminalScreen
 import com.maragung.arrowide.ui.tools.ToolsScreen
@@ -55,6 +57,7 @@ private val destinations = listOf(
     TopDestination("explorer", "Explorer", Icons.Filled.FolderOpen),
     TopDestination("editor", "Editor", Icons.Filled.Code),
     TopDestination("terminal", "Terminal", Icons.Filled.Terminal),
+    TopDestination("scm", "Git", Icons.Filled.CallSplit),
     TopDestination("tools", "Tools", Icons.Filled.Build),
     TopDestination("settings", "Settings", Icons.Filled.Settings)
 )
@@ -189,6 +192,15 @@ fun ArrowIDEApp(
                             newSessionCwd = workspace,
                             maxSessions = settings.maxTerminalSessions,
                             fontSizeDp = settings.terminalFontSize
+                        )
+                    }
+                    composable("scm") {
+                        // Source Control operates on the open project (plan #11).
+                        val workspace by container.workspaceManager.currentWorkspace
+                            .collectAsState()
+                        SourceControlScreen(
+                            git = container.gitService,
+                            workspace = workspace
                         )
                     }
                     composable("tools") {

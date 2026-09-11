@@ -5,6 +5,11 @@ import android.os.Build
 import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.editor.EditorTabManager
 import com.maragung.arrowide.editor.RecoveryStore
+import com.maragung.arrowide.git.AndroidGitProcess
+import com.maragung.arrowide.git.CredentialsProvider
+import com.maragung.arrowide.git.GitCredentials
+import com.maragung.arrowide.git.GitIdentity
+import com.maragung.arrowide.git.GitService
 import com.maragung.arrowide.terminal.ShellPtyFactory
 import com.maragung.arrowide.terminal.TerminalEnvironment
 import com.maragung.arrowide.terminal.TerminalSessionManager
@@ -13,7 +18,11 @@ import com.maragung.arrowide.toolchain.TermuxRepoClient
 import com.maragung.arrowide.toolchain.ToolchainEnvironment
 import com.maragung.arrowide.toolchain.ToolchainManager
 import com.maragung.arrowide.workspace.WorkspaceManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -73,4 +82,46 @@ class ArrowAppContainer(context: Context) {
         downloader = HttpPackageDownloader(),
         ioDispatcher = Dispatchers.IO
     )
+
+    /**
+     * Git plumbing (plan #10-#11): runs the toolchain's real git binary
+     * against the current project. Commit identity comes from settings
+     * (Settings → Git) and falls back to ~/.gitconfig when unset.
+     * Credentials: no provider yet — the GitHub PAT arrives in M4 and will
+     * be injected temporarily per operation (plan #38), never stored in
+     * remote URLs.
+     */
+    val gitService: GitService
+
+    /** Keeps a synchronous snapshot of settings for the identity provider. */
+    private var latestSettings = SettingsStore.AppSettings()
+
+    private val containerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    init {
+        containerScope.launch {
+            settingsStore.settings.collect { latestSettings = it }
+        }
+        gitService = GitService(
+            process = AndroidGitProcess(
+                homeDir = File(context.filesDir, "home"),
+                prefixDir = File(context.filesDir, "usr")
+            ),
+            homeDir = File(context.filesDir, "home"),
+            askpassCacheDir = File(context.cacheDir, "git-askpass"),
+            identityProvider = {
+                val s = latestSettings
+                val name = s.gitUserName
+                val email = s.gitUserEmail
+                if (!name.isNullOrBlank() && !email.isNullOrBlank()) {
+                    GitIdentity(name, email)
+                } else {
+                    null
+                }
+            },
+            credentialsProvider = object : CredentialsProvider {
+                override fun credentialsForUrl(url: String): GitCredentials? = null
+            }
+        )
+    }
 }

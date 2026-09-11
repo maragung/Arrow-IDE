@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -28,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maragung.arrowide.data.SettingsStore
@@ -151,6 +155,25 @@ fun SettingsScreen(
                     }
                 )
             }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            SectionHeader("Git")
+            Text(
+                text = "Commit identity. Leave empty to use ~/.gitconfig instead.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            SettingsTextFieldRow(
+                label = "Name",
+                value = settings.gitUserName.orEmpty(),
+                onCommit = { v -> update { it.copy(gitUserName = v.ifBlank { null }) } }
+            )
+            SettingsTextFieldRow(
+                label = "Email",
+                value = settings.gitUserEmail.orEmpty(),
+                onCommit = { v -> update { it.copy(gitUserEmail = v.ifBlank { null }) } }
+            )
             Spacer(Modifier.padding(bottom = 16.dp))
         }
     }
@@ -201,6 +224,30 @@ private fun SettingsSliderRow(
             onValueChangeFinished = { onCommit(sliderValue.roundToInt()) }
         )
     }
+}
+
+/**
+ * Text field row that persists the trimmed value when the user presses the
+ * IME Done action (via [onCommit]); a blank value clears the setting.
+ */
+@Composable
+private fun SettingsTextFieldRow(
+    label: String,
+    value: String,
+    onCommit: (String) -> Unit
+) {
+    var text by remember(value) { mutableStateOf(value) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onCommit(text.trim()) }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+    )
 }
 
 private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
