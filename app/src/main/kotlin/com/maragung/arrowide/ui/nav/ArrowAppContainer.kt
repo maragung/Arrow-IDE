@@ -2,6 +2,8 @@ package com.maragung.arrowide.ui.nav
 
 import android.content.Context
 import android.os.Build
+import com.maragung.arrowide.buildsystem.BuildSystemDetector
+import com.maragung.arrowide.buildsystem.ProjectEnvironment
 import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.editor.EditorTabManager
 import com.maragung.arrowide.editor.RecoveryStore
@@ -14,6 +16,8 @@ import com.maragung.arrowide.github.HttpUrlConnectionTransport
 import com.maragung.arrowide.terminal.ShellPtyFactory
 import com.maragung.arrowide.terminal.TerminalEnvironment
 import com.maragung.arrowide.terminal.TerminalSessionManager
+import com.maragung.arrowide.secrets.AndroidKeystoreSecretStore
+import com.maragung.arrowide.secrets.SecretStore
 import com.maragung.arrowide.toolchain.HttpPackageDownloader
 import com.maragung.arrowide.toolchain.TermuxRepoClient
 import com.maragung.arrowide.toolchain.ToolchainEnvironment
@@ -94,6 +98,19 @@ class ArrowAppContainer(context: Context) {
         tokenStore = AndroidKeystoreTokenStore(context),
         transport = HttpUrlConnectionTransport()
     )
+
+    /**
+     * Local secrets manager (plan #21): Keystore-encrypted key/value store
+     * for GITHUB_TOKEN, NPM_TOKEN, API_KEY etc. — masked in the UI, never
+     * logged, never committed.
+     */
+    val secretStore: SecretStore = AndroidKeystoreSecretStore(context)
+
+    /** Build-system detection (plan #24): marker files → real commands. */
+    val buildSystemDetector: BuildSystemDetector = BuildSystemDetector()
+
+    /** Project environment (plan #22): .env parsing + secret heuristics. */
+    val projectEnvironment: ProjectEnvironment = ProjectEnvironment()
 
     /**
      * Git plumbing (plan #10-#11): runs the toolchain's real git binary

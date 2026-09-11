@@ -1,5 +1,6 @@
 package com.maragung.arrowide.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,8 +13,11 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -47,6 +51,7 @@ import kotlin.math.roundToInt
 @Composable
 fun SettingsScreen(
     store: SettingsStore,
+    onOpenSecrets: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val settings by store.settings.collectAsStateWithLifecycle(
@@ -174,6 +179,35 @@ fun SettingsScreen(
                 value = settings.gitUserEmail.orEmpty(),
                 onCommit = { v -> update { it.copy(gitUserEmail = v.ifBlank { null }) } }
             )
+
+            if (onOpenSecrets != null) {
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+                SectionHeader("Security")
+                Text(
+                    text = "Locally stored secrets are encrypted with the Android Keystore.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenSecrets() }
+                        .padding(vertical = 14.dp)
+                ) {
+                    Text(
+                        text = "Secrets",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             Spacer(Modifier.padding(bottom = 16.dp))
         }
     }

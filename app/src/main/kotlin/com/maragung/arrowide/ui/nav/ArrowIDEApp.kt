@@ -1,24 +1,33 @@
 package com.maragung.arrowide.ui.nav
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Hammer
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
@@ -28,6 +37,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -40,14 +53,18 @@ import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.git.GitOutcome
+import com.maragung.arrowide.ui.build.BuildScreen
 import com.maragung.arrowide.ui.editor.EditorScreen
 import com.maragung.arrowide.ui.explorer.ExplorerScreen
 import com.maragung.arrowide.ui.github.GitHubScreen
 import com.maragung.arrowide.ui.home.HomeScreen
 import com.maragung.arrowide.ui.scm.SourceControlScreen
+import com.maragung.arrowide.ui.settings.SecretsScreen
 import com.maragung.arrowide.ui.settings.SettingsScreen
+import com.maragung.arrowide.ui.templates.TemplatesScreen
 import com.maragung.arrowide.ui.terminal.TerminalScreen
 import com.maragung.arrowide.ui.tools.ToolsScreen
+import kotlinx.coroutines.launch
 
 private data class TopDestination(
     val route: String,
@@ -62,9 +79,17 @@ private val destinations = listOf(
     TopDestination("terminal", "Terminal", Icons.Filled.Terminal),
     TopDestination("scm", "Git", Icons.Filled.CallSplit),
     TopDestination("github", "GitHub", Icons.Filled.Public),
+    TopDestination("build", "Build", Icons.Filled.Hammer),
+    TopDestination("templates", "Templates", Icons.Filled.CreateNewFolder),
     TopDestination("tools", "Tools", Icons.Filled.Build),
     TopDestination("settings", "Settings", Icons.Filled.Settings)
 )
+
+/**
+ * Routes pinned to the phone bottom bar; the rest surface through the
+ * "More" sheet. The tablet rail always shows everything.
+ */
+private val primaryRoutes = setOf("home", "explorer", "terminal", "scm", "settings")
 
 /**
  * Root composable of the app shell.
@@ -89,6 +114,9 @@ fun ArrowIDEApp(
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    var showMoreSheet by remember { mutableStateOf(false) }
+    val primary = destinations.filter { it.route in primaryRoutes }
+    val secondary = destinations.filter { it.route !in primaryRoutes }
 
     // NavHost already pops its internal back stack on system back; this makes
     // the behavior explicit and keeps it correct alongside top-level navigation.
@@ -103,7 +131,7 @@ fun ArrowIDEApp(
             bottomBar = {
                 if (!useRail) {
                     NavigationBar {
-                        destinations.forEach { destination ->
+                        primary.forEach { destination ->
                             NavigationBarItem(
                                 icon = {
                                     Icon(
@@ -116,10 +144,62 @@ fun ArrowIDEApp(
                                 onClick = { navController.navigateTopLevel(destination.route) }
                             )
                         }
+                        NavigationBarItem(
+                            icon = {
+                                Icon(Icons.Filled.MoreHoriz, contentDescription = "More")
+                            },
+                            label = { Text("More") },
+                            // Highlight "More" while one of its destinations is open.
+                            selected = currentRoute != null &&
+                                secondary.any { it.route == currentRoute },
+                            onClick = { showMoreSheet = true }
+                        )
                     }
                 }
             }
         ) { padding ->
+            if (showMoreSheet) {
+                ModalBottomSheet(onDismissRequest = { showMoreSheet = false }) {
+                    Text(
+                        text = "More",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 24.dp, bottom = 8.dp)
+                    )
+                    secondary.forEach { destination ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showMoreSheet = false
+                                    navController.navigateTopLevel(destination.route)
+                                }
+                                .padding(horizontal = 24.dp, vertical = 14.dp)
+                        ) {
+                            Icon(
+                                destination.icon,
+                                contentDescription = null,
+                                tint = if (currentRoute == destination.route) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Text(
+                                text = destination.label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (currentRoute == destination.route) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
+            }
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -225,11 +305,79 @@ fun ArrowIDEApp(
                             }
                         )
                     }
+                    composable("build") {
+                        // Build & one-tap actions (plan #24 + #33): commands
+                        // derived from the project's own files, run in a real
+                        // terminal session in the workspace.
+                        val workspace by container.workspaceManager.currentWorkspace
+                            .collectAsState()
+                        val settings by container.settingsStore.settings
+                            .collectAsStateWithLifecycle(
+                                initialValue = SettingsStore.AppSettings()
+                            )
+                        val scope = rememberCoroutineScope()
+                        BuildScreen(
+                            workspace = workspace,
+                            detector = container.buildSystemDetector,
+                            environment = container.projectEnvironment,
+                            toolAvailable = { toolId ->
+                                container.toolchainManager.isAvailable(toolId) ?: false
+                            },
+                            onRunInTerminal = { command, cwd ->
+                                container.terminalSessionManager
+                                    .createSession(cwd, settings.maxTerminalSessions)
+                                    .write((command + "\r").toByteArray())
+                                navController.navigateTopLevel("terminal")
+                            },
+                            onGitPull = {
+                                scope.launch {
+                                    workspace?.let {
+                                        container.gitService.repositoryFor(it).pull()
+                                    }
+                                }
+                            },
+                            onGitPush = {
+                                scope.launch {
+                                    workspace?.let {
+                                        container.gitService.repositoryFor(it).push()
+                                    }
+                                }
+                            },
+                            onOpenActions = { navController.navigateTopLevel("github") }
+                        )
+                    }
+                    composable("templates") {
+                        // Project & workflow templates (plan #47 + #48).
+                        val workspace by container.workspaceManager.currentWorkspace
+                            .collectAsState()
+                        TemplatesScreen(
+                            projectsDir = container.workspaceManager.projectsDir,
+                            workspace = workspace,
+                            toolAvailable = { toolId ->
+                                container.toolchainManager.isAvailable(toolId) ?: false
+                            },
+                            onProjectCreated = { project ->
+                                container.workspaceManager.setCurrentWorkspace(project)
+                                navController.navigateTopLevel("explorer")
+                            },
+                            onWorkflowCreated = { file ->
+                                container.editorTabManager.openFile(file)
+                                navController.navigateTopLevel("editor")
+                            }
+                        )
+                    }
+                    composable("secrets") {
+                        // Local secrets manager (plan #21), opened from Settings.
+                        SecretsScreen(store = container.secretStore)
+                    }
                     composable("tools") {
                         ToolsScreen(manager = container.toolchainManager)
                     }
                     composable("settings") {
-                        SettingsScreen(store = container.settingsStore)
+                        SettingsScreen(
+                            store = container.settingsStore,
+                            onOpenSecrets = { navController.navigateTopLevel("secrets") }
+                        )
                     }
                 }
             }
