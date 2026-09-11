@@ -198,14 +198,17 @@ object GitParser {
 
             if (isDetachedMarker(name)) continue
 
-            if (prefix == "* ") {
-                current = name
-            } else if (name.startsWith("remotes/")) {
+            if (name.startsWith("remotes/")) {
                 val remoteRef = name.removePrefix("remotes/")
                 if (!remoteRef.contains(" -> ")) {
                     remotes += remoteRef
                 }
             } else {
+                // The current branch is a local too — git lists it among
+                // the locals with a "*" marker.
+                if (prefix == "* ") {
+                    current = name
+                }
                 locals += name
             }
         }

@@ -62,6 +62,8 @@ class AndroidKeystoreTokenStore(
             null // unreadable (key rotated/corrupt) — behave as not connected
         } catch (e: IllegalArgumentException) {
             null // Base64.decode of corrupt data
+        } catch (e: IOException) {
+            null // unreadable file — behave as not connected
         }
     }
 

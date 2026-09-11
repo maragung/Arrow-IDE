@@ -158,7 +158,7 @@ internal class GitHubApi(
             entries
                 .filterIsInstance<JsonObject>()
                 .filterNot { "pull_request" in it }
-                .map { githubJson.decodeFromJsonElement(IssueDto.serializer(), it).toModel() }
+                .map { githubJson.decodeFromJsonElement<IssueDto>(it).toModel() }
         }
 
     suspend fun createRepository(

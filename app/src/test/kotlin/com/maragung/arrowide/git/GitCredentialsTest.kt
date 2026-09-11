@@ -99,19 +99,22 @@ class GitCredentialsTest {
         )
 
         var seenEnv: Map<String, String>? = null
+        var contentDuringRun: String? = null
         val result: GitOutcome<Unit> = provider.withAskpassEnv("https://github.com/x/y.git") { env ->
             seenEnv = env
+            // The script must exist and hold the credentials only for as
+            // long as the wrapped git invocation is running.
+            contentDuringRun = File(env.getValue("GIT_ASKPASS")).readText()
             GitOutcome.Ok(Unit)
         }
 
         assertTrue(result is GitOutcome.Ok<*>)
         val env = seenEnv!!
         val scriptFile = File(env.getValue("GIT_ASKPASS"))
-        assertTrue("script exists while git runs", scriptFile.isFile)
         assertEquals("0", env["GIT_TERMINAL_PROMPT"])
         assertEquals(
             AskpassScript.scriptContent(GitCredentials("alice", "ghp-token")),
-            scriptFile.readText(),
+            contentDuringRun,
         )
         assertFalse("script deleted after the run", scriptFile.exists())
         assertTrue("cache dir is empty again", dir.listFiles()!!.isEmpty())
