@@ -1,0 +1,101 @@
+{
+  "languages": [
+    {
+      "grammar": "textmate/java/syntaxes/java.tmLanguage.json",
+      "name": "java",
+      "scopeName": "source.java",
+      "languageConfiguration": "textmate/java/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/kotlin/syntaxes/Kotlin.tmLanguage",
+      "name": "kotlin",
+      "scopeName": "source.kotlin",
+      "languageConfiguration": "textmate/kotlin/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/python/syntaxes/python.tmLanguage.json",
+      "name": "python",
+      "scopeName": "source.python",
+      "languageConfiguration": "textmate/python/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/javascript/syntaxes/JavaScript.tmLanguage.json",
+      "name": "javascript",
+      "scopeName": "source.js",
+      "languageConfiguration": "textmate/javascript/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/typescript/syntaxes/TypeScript.tmLanguage.json",
+      "name": "typescript",
+      "scopeName": "source.ts",
+      "languageConfiguration": "textmate/typescript/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/json/syntaxes/JSON.tmLanguage.json",
+      "name": "json",
+      "scopeName": "source.json",
+      "languageConfiguration": "textmate/json/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/yaml/syntaxes/yaml.tmLanguage.json",
+      "name": "yaml",
+      "scopeName": "source.yaml",
+      "languageConfiguration": "textmate/yaml/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/yaml/syntaxes/yaml-1.0.tmLanguage.json",
+      "name": "yaml-1.0",
+      "scopeName": "source.yaml.1.0"
+    },
+    {
+      "grammar": "textmate/yaml/syntaxes/yaml-1.1.tmLanguage.json",
+      "name": "yaml-1.1",
+      "scopeName": "source.yaml.1.1"
+    },
+    {
+      "grammar": "textmate/yaml/syntaxes/yaml-1.2.tmLanguage.json",
+      "name": "yaml-1.2",
+      "scopeName": "source.yaml.1.2"
+    },
+    {
+      "grammar": "textmate/yaml/syntaxes/yaml-1.3.tmLanguage.json",
+      "name": "yaml-1.3",
+      "scopeName": "source.yaml.1.3"
+    },
+    {
+      "grammar": "textmate/yaml/syntaxes/yaml-embedded.tmLanguage.json",
+      "name": "yaml-embedded",
+      "scopeName": "source.yaml.embedded"
+    },
+    {
+      "grammar": "textmate/markdown/syntaxes/markdown.tmLanguage.json",
+      "name": "markdown",
+      "scopeName": "text.html.markdown",
+      "languageConfiguration": "textmate/markdown/language-configuration.json",
+      "embeddedLanguages": {
+        "meta.embedded.block.html": "html",
+        "source.js": "javascript",
+        "meta.embedded.block.java": "java",
+        "meta.embedded.block.xml": "xml",
+        "meta.embedded.block.python": "python"
+      }
+    },
+    {
+      "grammar": "textmate/c/syntaxes/c.tmLanguage.json",
+      "name": "c",
+      "scopeName": "source.c",
+      "languageConfiguration": "textmate/c/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/cpp/syntaxes/cpp.tmLanguage.json",
+      "name": "cpp",
+      "scopeName": "source.cpp",
+      "languageConfiguration": "textmate/cpp/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/cpp/syntaxes/cpp.embedded.macro.tmLanguage.json",
+      "name": "cpp-embedded-macro",
+      "scopeName": "source.cpp.embedded.macro"
+    }
+  ]
+}
