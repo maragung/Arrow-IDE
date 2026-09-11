@@ -52,8 +52,8 @@ class LanguageRegistryTest {
     fun everyLanguageReferencesGrammarAssetPath() {
         for (language in LanguageRegistry.languages) {
             assertTrue(
-                language.grammarAssetPath.startsWith("textmate/"),
-                "${language.id}: ${language.grammarAssetPath}"
+                "${language.id}: ${language.grammarAssetPath}",
+                language.grammarAssetPath.startsWith("textmate/")
             )
         }
     }

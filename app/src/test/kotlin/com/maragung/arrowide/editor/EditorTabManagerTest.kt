@@ -231,7 +231,7 @@ class EditorTabManagerTest {
         val a = m.openFile(newFile("a.txt"))
 
         assertNotNull(m.tabFor(File(a.file.canonicalPath)))
-        assertEquals(a.id, m.tabFor(File(a.file.path)).id)
+        assertEquals(a.id, m.tabFor(File(a.file.path))?.id)
         assertNull(m.tabFor(newFile("other.txt")))
     }
 }
