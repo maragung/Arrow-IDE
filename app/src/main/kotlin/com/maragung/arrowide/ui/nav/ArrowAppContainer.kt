@@ -6,10 +6,11 @@ import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.editor.EditorTabManager
 import com.maragung.arrowide.editor.RecoveryStore
 import com.maragung.arrowide.git.AndroidGitProcess
-import com.maragung.arrowide.git.CredentialsProvider
-import com.maragung.arrowide.git.GitCredentials
 import com.maragung.arrowide.git.GitIdentity
 import com.maragung.arrowide.git.GitService
+import com.maragung.arrowide.github.AndroidKeystoreTokenStore
+import com.maragung.arrowide.github.GitHubService
+import com.maragung.arrowide.github.HttpUrlConnectionTransport
 import com.maragung.arrowide.terminal.ShellPtyFactory
 import com.maragung.arrowide.terminal.TerminalEnvironment
 import com.maragung.arrowide.terminal.TerminalSessionManager
@@ -84,12 +85,23 @@ class ArrowAppContainer(context: Context) {
     )
 
     /**
+     * GitHub integration (plan #12-#16): REST API over an injectable
+     * transport; the PAT lives only in the Android Keystore-encrypted
+     * token store and is handed to git per operation via [gitCredentials]
+     * (plan #38) — never stored in remote URLs or git config.
+     */
+    val githubService: GitHubService = GitHubService(
+        tokenStore = AndroidKeystoreTokenStore(context),
+        transport = HttpUrlConnectionTransport()
+    )
+
+    /**
      * Git plumbing (plan #10-#11): runs the toolchain's real git binary
      * against the current project. Commit identity comes from settings
      * (Settings → Git) and falls back to ~/.gitconfig when unset.
-     * Credentials: no provider yet — the GitHub PAT arrives in M4 and will
-     * be injected temporarily per operation (plan #38), never stored in
-     * remote URLs.
+     * Credentials come from the stored GitHub PAT (late-bound — reads the
+     * token store per operation, so connect/disconnect take effect
+     * immediately).
      */
     val gitService: GitService
 
@@ -119,9 +131,7 @@ class ArrowAppContainer(context: Context) {
                     null
                 }
             },
-            credentialsProvider = object : CredentialsProvider {
-                override fun credentialsForUrl(url: String): GitCredentials? = null
-            }
+            credentialsProvider = githubService.gitCredentials()
         )
     }
 }

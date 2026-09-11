@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,8 +39,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maragung.arrowide.data.SettingsStore
+import com.maragung.arrowide.git.GitOutcome
 import com.maragung.arrowide.ui.editor.EditorScreen
 import com.maragung.arrowide.ui.explorer.ExplorerScreen
+import com.maragung.arrowide.ui.github.GitHubScreen
 import com.maragung.arrowide.ui.home.HomeScreen
 import com.maragung.arrowide.ui.scm.SourceControlScreen
 import com.maragung.arrowide.ui.settings.SettingsScreen
@@ -58,6 +61,7 @@ private val destinations = listOf(
     TopDestination("editor", "Editor", Icons.Filled.Code),
     TopDestination("terminal", "Terminal", Icons.Filled.Terminal),
     TopDestination("scm", "Git", Icons.Filled.CallSplit),
+    TopDestination("github", "GitHub", Icons.Filled.Public),
     TopDestination("tools", "Tools", Icons.Filled.Build),
     TopDestination("settings", "Settings", Icons.Filled.Settings)
 )
@@ -67,9 +71,9 @@ private val destinations = listOf(
  *
  * Adaptive navigation (plan #41): on wide screens (>= 840dp) a permanent
  * [NavigationRail] sits on the left (tablet layout); on narrower screens a
- * [NavigationBar] sits at the bottom (phone layout). Either way the same six
- * destinations are reachable: Home, Explorer, Editor, Terminal, Tools,
- * Settings.
+ * [NavigationBar] sits at the bottom (phone layout). Either way the same
+ * destinations are reachable: Home, Explorer, Editor, Terminal, Git,
+ * GitHub, Tools, Settings.
  *
  * Editor and Terminal route to their real subsystem screens
  * ([com.maragung.arrowide.ui.editor.EditorScreen],
@@ -201,6 +205,24 @@ fun ArrowIDEApp(
                         SourceControlScreen(
                             git = container.gitService,
                             workspace = workspace
+                        )
+                    }
+                    composable("github") {
+                        // GitHub (plan #12-#16): connect with a PAT, browse
+                        // repos, clone into ~/projects, inspect Actions runs.
+                        GitHubScreen(
+                            github = container.githubService,
+                            projectsDir = container.workspaceManager.projectsDir,
+                            onProjectCloned = { project ->
+                                container.workspaceManager.setCurrentWorkspace(project)
+                                navController.navigateTopLevel("explorer")
+                            },
+                            cloneRepository = { url, destDir ->
+                                val outcome = container.gitService
+                                    .repositoryFor(destDir)
+                                    .clone(url, destDir)
+                                outcome is GitOutcome.Ok
+                            }
                         )
                     }
                     composable("tools") {
