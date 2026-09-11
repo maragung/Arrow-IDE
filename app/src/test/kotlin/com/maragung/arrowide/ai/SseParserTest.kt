@@ -111,7 +111,9 @@ class SseParserTest {
     fun spaceAfterTheColonIsStrippedButDeeperSpacesAreKept() {
         val parser = SseParser()
 
-        val events = parser.feed("data:  two leading spaces kept\nevent:  spaced\n\n")
+        // One space after the colon is the separator; anything deeper is
+        // part of the value — for BOTH fields (SSE spec).
+        val events = parser.feed("data:  two leading spaces kept\nevent: spaced\n\n")
 
         assertEquals(
             listOf(SseEvent("spaced", " two leading spaces kept")),
