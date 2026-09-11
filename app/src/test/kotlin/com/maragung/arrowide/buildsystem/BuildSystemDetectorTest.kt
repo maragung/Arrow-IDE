@@ -38,7 +38,7 @@ class BuildSystemDetectorTest {
     // ------------------------------------------------------------------- node
 
     @Test
-    fun `package.json with start build test scripts yields node commands`() {
+    fun `package json with start build test scripts yields node commands`() {
         val dir = tmp.newFolder()
         File(dir, "package.json").writeText(
             """
