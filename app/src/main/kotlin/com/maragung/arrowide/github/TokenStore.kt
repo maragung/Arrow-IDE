@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import java.io.File
+import java.io.IOException
 import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.security.SecureRandom
