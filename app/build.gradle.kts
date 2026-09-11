@@ -76,6 +76,10 @@ dependencies {
     implementation(libs.sora.editor)
     implementation(libs.sora.language.textmate)
 
+    // Toolchain: .deb (ar) + tar.xz extraction (plan #4-#7), pure Java
+    implementation(libs.xz)
+    implementation(libs.commons.compress)
+
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)

@@ -11,6 +11,8 @@ navigationCompose = "2.7.7"
 datastore = "1.1.1"
 serializationJson = "1.6.3"
 soraEditor = "0.23.6"
+xz = "1.9"
+commonsCompress = "1.26.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -32,6 +34,8 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
 sora-editor = { group = "io.github.Rosemoe.sora-editor", name = "editor", version.ref = "soraEditor" }
 sora-language-textmate = { group = "io.github.Rosemoe.sora-editor", name = "language-textmate", version.ref = "soraEditor" }
+xz = { group = "org.tukaani", name = "xz", version.ref = "xz" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
