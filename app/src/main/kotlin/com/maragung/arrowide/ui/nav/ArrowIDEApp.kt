@@ -18,11 +18,14 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -298,11 +301,11 @@ fun ArrowIDEApp(
                         SearchScreen(
                             workspace = workspace,
                             onOpenMatch = { file, line ->
-                                container.editorTabManager.openFile(file)
+                                val tab = container.editorTabManager.openFile(file)
                                 navController.navigateTopLevel("editor")
                                 // The editor scrolls to the pushed cursor line.
                                 container.editorTabManager.updateCursor(
-                                    container.editorTabManager.tabFor(file)?.id ?: return@SearchScreen,
+                                    tab.id,
                                     line - 1,
                                     0,
                                 )

@@ -181,15 +181,7 @@ class ArrowAppContainer(context: Context) {
      */
     val gitService: GitService
 
-    /** Keeps a synchronous snapshot of settings for the identity provider. */
-    private var latestSettings = SettingsStore.AppSettings()
-
-    private val containerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     init {
-        containerScope.launch {
-            settingsStore.settings.collect { latestSettings = it }
-        }
         gitService = GitService(
             process = AndroidGitProcess(
                 homeDir = File(context.filesDir, "home"),

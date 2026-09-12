@@ -122,13 +122,14 @@ fun PackagesScreen(
         }
     }
 
-    if (addDialog) {
+    if (addDialog && workspace != null) {
+        val ws = workspace
         AddPackageDialog(
             ecosystems = ecosystems,
             onDismiss = { addDialog = false },
             onConfirm = { ecosystem, name ->
                 addDialog = false
-                packageManager.installCommand(ecosystem, name, workspace)?.let {
+                packageManager.installCommand(ecosystem, name, ws)?.let {
                     pendingCommand = it
                 } ?: run { message = missingToolMessage(ecosystem) }
             },
@@ -136,12 +137,13 @@ fun PackagesScreen(
     }
 
     pendingCommand?.let { command ->
+        val ws = workspace ?: return@let
         ConfirmCommandDialog(
             command = command,
             onDismiss = { pendingCommand = null },
             onRun = {
                 pendingCommand = null
-                onRunInTerminal(command.command, workspace)
+                onRunInTerminal(command.command, ws)
             },
         )
     }
