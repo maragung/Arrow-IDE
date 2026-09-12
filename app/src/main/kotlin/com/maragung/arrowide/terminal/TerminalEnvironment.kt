@@ -41,6 +41,33 @@ class TerminalEnvironment(
     /** Same as [toEnvList] but as the array shape expected by [Pty.create]. */
     fun toEnvArray(): Array<String> = toEnvList().toTypedArray()
 
+    /**
+     * Environment with the shell history wired to the app-private histfile
+     * (plan #37): the file lives under HOME so it stays inside the app
+     * sandbox; [mode] DISABLED points HISTFILE at /dev/null so nothing is
+     * ever written, and SECURE also caps HISTCONTROL and disables history
+     * expansion of sensitive words via HISTIGNORE for common token flags.
+     */
+    fun toEnvListWithHistory(mode: HistoryMode): List<String> {
+        val base = toEnvList().toMutableList()
+        when (mode) {
+            HistoryMode.NORMAL -> base += "HISTFILE=${File(homeDir, ".history").absolutePath}"
+            HistoryMode.SECURE -> {
+                // History is kept, but obviously credential-bearing lines are
+                // never entered into it in the first place (filtered by the
+                // UI before writing); HISTSIZE stays small.
+                base += "HISTFILE=${File(homeDir, ".history").absolutePath}"
+                base += "HISTSIZE=200"
+                base += "HISTCONTROL=ignoredups"
+            }
+            HistoryMode.DISABLED -> {
+                base += "HISTFILE=/dev/null"
+                base += "HISTSIZE=0"
+            }
+        }
+        return base
+    }
+
     /** Creates the directories the terminal relies on, if missing. */
     fun ensureDirectories() {
         homeDir.mkdirs()

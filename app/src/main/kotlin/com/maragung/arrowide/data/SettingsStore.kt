@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.maragung.arrowide.terminal.HistoryMode
 import com.maragung.arrowide.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -30,6 +31,8 @@ class SettingsStore(private val context: Context) {
         val scrollbackLines: Int = 5000,
         val maxTerminalSessions: Int = 5,
         val sessionLimitWarn: Boolean = true,
+        /** Command-history policy for terminal sessions (plan #37). */
+        val historyMode: HistoryMode = HistoryMode.NORMAL,
         /** Git commit identity (plan #10); nulls fall back to ~/.gitconfig. */
         val gitUserName: String? = null,
         val gitUserEmail: String? = null
@@ -51,6 +54,7 @@ class SettingsStore(private val context: Context) {
             preferences[SCROLLBACK_LINES] = updated.scrollbackLines
             preferences[MAX_TERMINAL_SESSIONS] = updated.maxTerminalSessions
             preferences[SESSION_LIMIT_WARN] = updated.sessionLimitWarn
+            preferences[HISTORY_MODE] = updated.historyMode.name
             // Blank means "unset" — persisted as absent keys (Preferences
             // DataStore values are non-null).
             val gitName = updated.gitUserName?.takeIf { it.isNotBlank() }
@@ -72,6 +76,9 @@ class SettingsStore(private val context: Context) {
             scrollbackLines = this[SCROLLBACK_LINES] ?: 5000,
             maxTerminalSessions = this[MAX_TERMINAL_SESSIONS] ?: 5,
             sessionLimitWarn = this[SESSION_LIMIT_WARN] ?: true,
+            historyMode = this[HISTORY_MODE]
+                ?.let { stored -> runCatching { HistoryMode.valueOf(stored) }.getOrNull() }
+                ?: HistoryMode.NORMAL,
             gitUserName = this[GIT_USER_NAME]?.takeIf { it.isNotBlank() },
             gitUserEmail = this[GIT_USER_EMAIL]?.takeIf { it.isNotBlank() }
         )
@@ -83,6 +90,7 @@ class SettingsStore(private val context: Context) {
         val SCROLLBACK_LINES = intPreferencesKey("scrollback_lines")
         val MAX_TERMINAL_SESSIONS = intPreferencesKey("max_terminal_sessions")
         val SESSION_LIMIT_WARN = booleanPreferencesKey("session_limit_warn")
+        val HISTORY_MODE = stringPreferencesKey("history_mode")
         val GIT_USER_NAME = stringPreferencesKey("git_user_name")
         val GIT_USER_EMAIL = stringPreferencesKey("git_user_email")
     }

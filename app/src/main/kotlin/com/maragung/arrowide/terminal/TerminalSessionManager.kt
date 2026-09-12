@@ -44,6 +44,8 @@ class ShellPtyFactory(
     private val environment: TerminalEnvironment,
     private val workspaceRoot: File? = null,
     private val shell: String = TerminalEnvironment.DEFAULT_SHELL,
+    /** Late-bound so Settings changes apply to NEW sessions (plan #37). */
+    private val historyModeProvider: () -> HistoryMode = { HistoryMode.NORMAL },
 ) : PtyFactory {
 
     private val idCounter = AtomicInteger(0)
@@ -55,7 +57,10 @@ class ShellPtyFactory(
         environment.ensureDirectories()
         val resolvedCwd = resolveCwd(cwd)
         val argv = arrayOf(shell)
-        val env = environment.toEnvArray()
+        // History policy (plan #37) is applied through the environment:
+        // the app-private histfile stays inside the sandbox.
+        val env = environment.toEnvListWithHistory(historyModeProvider())
+            .toTypedArray()
         val process = UnixPtyProcess(
             cmd = shell,
             argv = argv,

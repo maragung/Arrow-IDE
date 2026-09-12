@@ -61,7 +61,11 @@ import com.maragung.arrowide.ui.editor.EditorScreen
 import com.maragung.arrowide.ui.explorer.ExplorerScreen
 import com.maragung.arrowide.ui.github.GitHubScreen
 import com.maragung.arrowide.ui.home.HomeScreen
+import com.maragung.arrowide.ui.packages.PackagesScreen
+import com.maragung.arrowide.ui.process.PortsScreen
+import com.maragung.arrowide.ui.process.ProcessesScreen
 import com.maragung.arrowide.ui.scm.SourceControlScreen
+import com.maragung.arrowide.ui.search.SearchScreen
 import com.maragung.arrowide.ui.settings.SecretsScreen
 import com.maragung.arrowide.ui.settings.SettingsScreen
 import com.maragung.arrowide.ui.templates.TemplatesScreen
@@ -78,10 +82,14 @@ private data class TopDestination(
 private val destinations = listOf(
     TopDestination("home", "Home", Icons.Filled.Home),
     TopDestination("explorer", "Explorer", Icons.Filled.FolderOpen),
+    TopDestination("search", "Search", Icons.Filled.Search),
     TopDestination("editor", "Editor", Icons.Filled.Code),
     TopDestination("terminal", "Terminal", Icons.Filled.Terminal),
+    TopDestination("processes", "Processes", Icons.Filled.Layers),
+    TopDestination("ports", "Ports", Icons.Filled.Public),
     TopDestination("scm", "Git", Icons.Filled.CallSplit),
     TopDestination("github", "GitHub", Icons.Filled.Public),
+    TopDestination("packages", "Packages", Icons.Filled.DataObject),
     TopDestination("ai", "AI", Icons.Filled.AutoAwesome),
     TopDestination("build", "Build", Icons.Filled.PlayArrow),
     TopDestination("templates", "Templates", Icons.Filled.CreateNewFolder),
@@ -93,7 +101,7 @@ private val destinations = listOf(
  * Routes pinned to the phone bottom bar; the rest surface through the
  * "More" sheet. The tablet rail always shows everything.
  */
-private val primaryRoutes = setOf("home", "explorer", "terminal", "scm", "settings")
+private val primaryRoutes = setOf("home", "explorer", "search", "terminal", "scm", "settings")
 
 /**
  * Root composable of the app shell.
@@ -280,6 +288,71 @@ fun ArrowIDEApp(
                             newSessionCwd = workspace,
                             maxSessions = settings.maxTerminalSessions,
                             fontSizeDp = settings.terminalFontSize
+                        )
+                    }
+                    composable("search") {
+                        // Project-wide search (plan #31): matches open in the
+                        // editor at the exact line.
+                        val workspace by container.workspaceManager.currentWorkspace
+                            .collectAsState()
+                        SearchScreen(
+                            workspace = workspace,
+                            onOpenMatch = { file, line ->
+                                container.editorTabManager.openFile(file)
+                                navController.navigateTopLevel("editor")
+                                // The editor scrolls to the pushed cursor line.
+                                container.editorTabManager.updateCursor(
+                                    container.editorTabManager.tabFor(file)?.id ?: return@SearchScreen,
+                                    line - 1,
+                                    0,
+                                )
+                            },
+                        )
+                    }
+                    composable("processes") {
+                        // Background process manager (plan #25): live view of
+                        // every terminal session; control via the manager.
+                        ProcessesScreen(
+                            processManager = container.processManager,
+                            terminalManager = container.terminalSessionManager,
+                            onOpenTerminal = { navController.navigateTopLevel("terminal") },
+                        )
+                    }
+                    composable("ports") {
+                        // Port manager (plan #27/#28): this app's listening
+                        // sockets mapped to their terminal sessions.
+                        PortsScreen(
+                            portScanner = container.portScanner,
+                            sessionIdsToTitles = { ids ->
+                                container.terminalSessionManager.sessions.value
+                                    .filter { it.id in ids }
+                                    .map { it.title.value }
+                            },
+                            onKillSessions = { ids ->
+                                container.terminalSessionManager.sessions.value
+                                    .filter { it.id in ids }
+                                    .forEach(container.terminalSessionManager::killSession)
+                            },
+                        )
+                    }
+                    composable("packages") {
+                        // Package manager UI (plan #29): every action runs a
+                        // real package command in a real terminal session.
+                        val workspace by container.workspaceManager.currentWorkspace
+                            .collectAsState()
+                        val settings by container.settingsStore.settings
+                            .collectAsStateWithLifecycle(
+                                initialValue = SettingsStore.AppSettings()
+                            )
+                        PackagesScreen(
+                            workspace = workspace,
+                            packageManager = container.projectPackageManager,
+                            onRunInTerminal = { command, cwd ->
+                                container.terminalSessionManager
+                                    .createSession(cwd, settings.maxTerminalSessions)
+                                    .write((command + "\r").toByteArray())
+                                navController.navigateTopLevel("terminal")
+                            },
                         )
                     }
                     composable("scm") {

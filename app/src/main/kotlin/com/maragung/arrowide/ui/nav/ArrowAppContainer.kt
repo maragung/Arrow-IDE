@@ -17,6 +17,9 @@ import com.maragung.arrowide.github.HttpUrlConnectionTransport
 import com.maragung.arrowide.terminal.ShellPtyFactory
 import com.maragung.arrowide.terminal.TerminalEnvironment
 import com.maragung.arrowide.terminal.TerminalSessionManager
+import com.maragung.arrowide.packages.ProjectPackageManager
+import com.maragung.arrowide.process.PortScanner
+import com.maragung.arrowide.process.ProcessManager
 import com.maragung.arrowide.secrets.AndroidKeystoreSecretStore
 import com.maragung.arrowide.secrets.SecretStore
 import com.maragung.arrowide.toolchain.HttpPackageDownloader
@@ -60,13 +63,28 @@ class ArrowAppContainer(context: Context) {
      */
     val terminalSessionManager: TerminalSessionManager
 
+    /** Keeps a synchronous snapshot of settings for the identity provider. */
+    private var latestSettings = SettingsStore.AppSettings()
+
+    private val containerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    init {
+        containerScope.launch {
+            settingsStore.settings.collect { latestSettings = it }
+        }
+    }
+
     init {
         val environment = TerminalEnvironment(
             homeDir = File(context.filesDir, "home"),
             prefixDir = File(context.filesDir, "usr"),
             tmpDir = File(context.cacheDir, "tmp")
         )
-        terminalSessionManager = TerminalSessionManager(ShellPtyFactory(environment))
+        // History policy (plan #37) is read per session so Settings changes
+        // apply to every NEW terminal without restarting the app.
+        terminalSessionManager = TerminalSessionManager(
+            ShellPtyFactory(environment, historyModeProvider = { latestSettings.historyMode })
+        )
     }
 
     /**
@@ -132,6 +150,26 @@ class ArrowAppContainer(context: Context) {
 
     /** Project environment (plan #22): .env parsing + secret heuristics. */
     val projectEnvironment: ProjectEnvironment = ProjectEnvironment()
+
+    /**
+     * Background Process Manager (plan #25): read-only live view over the
+     * terminal sessions; kill/restart stay with the session manager.
+     */
+    val processManager: ProcessManager = ProcessManager(terminalSessionManager.sessions)
+
+    /**
+     * Port scanner (plan #27/#28): detects this app's listening TCP
+     * sockets from /proc and maps them to terminal sessions.
+     */
+    val portScanner: PortScanner = PortScanner(uid = android.os.Process.myUid())
+
+    /**
+     * Package manager UI core (plan #29): dependency listing + real
+     * install/remove/update commands against the installed toolchain.
+     */
+    val projectPackageManager: ProjectPackageManager = ProjectPackageManager(
+        toolAvailable = { toolId -> toolchainManager.isAvailable(toolId) ?: false },
+    )
 
     /**
      * Git plumbing (plan #10-#11): runs the toolchain's real git binary

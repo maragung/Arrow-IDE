@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maragung.arrowide.data.SettingsStore
+import com.maragung.arrowide.terminal.HistoryMode
 import com.maragung.arrowide.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -159,6 +160,37 @@ fun SettingsScreen(
                         update { it.copy(sessionLimitWarn = checked) }
                     }
                 )
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            SectionHeader("Command history")
+            Text(
+                text = "Normal keeps everything in the app-private history " +
+                    "file. Secure skips commands containing credentials " +
+                    "(token, password, secret…). Disabled never writes history.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            HistoryMode.entries.forEach { mode ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = settings.historyMode == mode,
+                            role = Role.RadioButton,
+                            onClick = { update { it.copy(historyMode = mode) } }
+                        )
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = settings.historyMode == mode,
+                        onClick = { update { it.copy(historyMode = mode) } }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(historyModeLabel(mode))
+                }
             }
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
@@ -288,4 +320,10 @@ private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
     ThemeMode.SYSTEM -> "Follow system"
     ThemeMode.LIGHT -> "Light"
     ThemeMode.DARK -> "Dark"
+}
+
+private fun historyModeLabel(mode: HistoryMode): String = when (mode) {
+    HistoryMode.NORMAL -> "Normal"
+    HistoryMode.SECURE -> "Secure (skip credentials)"
+    HistoryMode.DISABLED -> "Disabled"
 }
