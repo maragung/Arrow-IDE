@@ -32,6 +32,13 @@ android {
         }
     }
 
+    lint {
+        // targetSdk is intentionally 28 (Termux-style W^X workaround) and the
+        // app ships via GitHub Releases, not Google Play — the "apps must
+        // target API 33+" rule does not apply here.
+        disable += "ExpiredTargetSdkVersion"
+    }
+
     // The release signing keystore is bootstrapped by CI on the first
     // Release run (keytool runs on the runner; no JDK on dev machines).
     // When present, release builds are signed; otherwise they stay
