@@ -48,7 +48,9 @@ class CommandHistorySecurityTest {
     @Test
     fun normalModePointsHistfileAtTheAppPrivateFile() {
         val env = environment.toEnvListWithHistory(HistoryMode.NORMAL)
-        val histfile = env.first { it.startsWith("HISTFILE=") }
+        val histfile = env
+            .first { it.startsWith("HISTFILE=") }
+            .removePrefix("HISTFILE=")
         assertTrue(histfile.endsWith("/home/.history"))
         assertTrue(histfile.startsWith("/data/local/tmp"))
     }

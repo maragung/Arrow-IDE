@@ -49,7 +49,8 @@ class PortScannerTest {
             fds.forEachIndexed { index, target ->
                 val link = File(fdDir, index.toString())
                 link.createNewFile()
-                // A symlink is required for canonicalPath resolution.
+                // A symlink is required: the scanner reads it with
+                // Files.readSymbolicLink to get the raw target.
                 link.delete()
                 java.nio.file.Files.createSymbolicLink(
                     link.toPath(),

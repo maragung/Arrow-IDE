@@ -2,6 +2,7 @@ package com.maragung.arrowide.process
 
 import com.maragung.arrowide.terminal.TerminalSession
 import java.io.File
+import java.nio.file.Files
 
 /** Transport a listening socket was found on. */
 enum class PortProtocol { TCP, TCP6 }
@@ -121,7 +122,12 @@ class PortScanner(
             val fds = runCatching { fdDir.listFiles() }.getOrNull() ?: continue
             val pid = pidDir.name.toLong()
             for (fd in fds) {
-                val target = runCatching { fd.canonicalPath }.getOrNull() ?: continue
+                // Read the raw symlink target ("socket:[<inode>]").
+                // canonicalPath would resolve the relative target against the
+                // fd directory and never match the prefix.
+                val target = runCatching {
+                    Files.readSymbolicLink(fd.toPath()).toString()
+                }.getOrNull() ?: continue
                 val inode = target.substringAfter(SOCKET_PREFIX, "")
                     .removeSuffix("]")
                 if (target.startsWith(SOCKET_PREFIX) && inode.isNotEmpty()) {
