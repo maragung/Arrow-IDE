@@ -30,13 +30,33 @@ android {
         }
     }
 
+    // The release signing keystore is bootstrapped by CI on the first
+    // Release run (keytool runs on the runner; no JDK on dev machines).
+    // When present, release builds are signed; otherwise they stay
+    // unsigned and the workflow regenerates the key.
+    val keystorePropertiesFile = rootProject.file("keystore/keystore.properties")
+    val keystoreFile = rootProject.file("keystore/arrow-release.jks")
+    if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
+        val keystoreProperties = java.util.Properties().apply {
+            keystorePropertiesFile.inputStream().use { load(it) }
+        }
+        signingConfigs {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // Minification stays OFF for now: sora-editor's TextMate
+            // grammars and kotlinx-serialization use reflective loading that
+            // R8 can strip; re-enable only after on-device validation.
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

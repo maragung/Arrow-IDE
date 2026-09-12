@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache Android NDK & CMake
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/ndk
+            /usr/local/lib/android/sdk/cmake
+          key: android-ndk-cmake-v1
+
+      # No JDK on dev machines (per project rules), so the signing key is
+      # generated here on the first Release run and committed. The keystore
+      # lives in the repo: anyone can already build the app from source, and
+      # this keeps signing stable across releases without secret plumbing.
+      # To harden later: move the keystore to a base64 secret and delete the
+      # files from the repo (then rotate the key).
+      - name: Bootstrap release signing key (first run only)
+        if: ${{ !hashFiles('keystore/arrow-release.jks') }}
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair -v \
+            -keystore keystore/arrow-release.jks \
+            -storetype PKCS12 \
+            -alias arrow \
+            -keyalg RSA -keysize 4096 -validity 10000 \
+            -storepass arrowide -keypass arrowide \
+            -dname "CN=Arrow IDE, OU=Apps, O=maragung, C=ID"
+          cat > keystore/keystore.properties <<'EOF'
+          storeFile=arrow-release.jks
+          storePassword=arrowide
+          keyAlias=arrow
+          keyPassword=arrowide
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add keystore
+          git commit -m "Add release signing keystore (bootstrapped by CI)"
+          git push
+          echo "Keystore bootstrapped and committed; future releases reuse it."
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease testReleaseUnitTest --stacktrace
+
+      - name: Extract version
+        id: ver
+        run: |
+          VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing Arrow IDE v$VERSION"
+
+      - name: Create GitHub Release with APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.ver.outputs.version }}"
+          cp app/build/outputs/apk/release/app-release.apk "Arrow-IDE-${TAG}.apk"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists — replacing the APK"
+            gh release upload "$TAG" "Arrow-IDE-${TAG}.apk" --clobber
+          else
+            gh release create "$TAG" \
+              --title "Arrow IDE ${TAG}" \
+              --generate-notes \
+              "Arrow-IDE-${TAG}.apk"
+          fi
