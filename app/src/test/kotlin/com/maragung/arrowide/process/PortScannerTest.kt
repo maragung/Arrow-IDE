@@ -60,14 +60,19 @@ class PortScannerTest {
         return root
     }
 
+    /**
+     * One /proc/net/tcp row in the real 14-column layout:
+     * sl local rem st tx:rx tr:when retrnsmt uid timeout inode ...
+     * (uid is decimal, matching the kernel's output).
+     */
     private fun row(
         portHex: String,
         state: String = "0A",
         uid: Int = this.uid,
         inode: String,
     ): String =
-        "  0: 0100007F:$portHex 00000000:0000 $state ${"%05X".format(uid)} " +
-            "00000000 $inode 0000000000000000 1000 0 0000000000000000"
+        "  0: 0100007F:$portHex 00000000:0000 $state 00000000:00000000 " +
+            "00000000 00000000 $uid 00000000 $inode 0000000000000000 1000 0 0"
 
     private fun scanner(procRoot: File): PortScanner =
         PortScanner(
@@ -141,9 +146,10 @@ class PortScannerTest {
         val root = fakeProc(
             tcpRows = emptyList(),
             tcp6Rows = listOf(
-                "  0: 00000000000000000000000000000001:1388 0000000000000000" +
-                    "0000000000000000:0000 0A ${"%05X".format(uid)} 00000000 " +
-                    "777 0",
+                // Real layout: local rem st tx:rx tr:when retrnsmt uid timeout inode
+                "  0: 00000000000000000000000000000001:1388 " +
+                    "00000000000000000000000000000000:0000 0A 00000000:00000000 " +
+                    "00000000 00000000 $uid 00000000 777 0000000000000000 1000 0 0",
             ),
             pidFds = mapOf(55L to listOf("socket:[777]")),
         )
