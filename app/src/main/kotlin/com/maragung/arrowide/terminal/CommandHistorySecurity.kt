@@ -22,7 +22,7 @@ enum class HistoryMode {
 object CommandHistorySecurity {
 
     private val SENSITIVE_MARKERS = listOf(
-        "token", "password", "passwd", "api key", "apikey", "secret", "credential",
+        "token", "password", "passwd", "api key", "apikey", "api_key", "secret", "credential",
     )
 
     /** True when [command] looks like it embeds a credential inline. */

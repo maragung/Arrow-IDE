@@ -30,7 +30,7 @@ class CommandHistorySecurityTest {
         assertTrue(CommandHistorySecurity.looksSensitive("export GITHUB_TOKEN=abc"))
         assertTrue(CommandHistorySecurity.looksSensitive("curl -H 'password: x' https://x"))
         assertTrue(CommandHistorySecurity.looksSensitive("kubectl create secret generic s"))
-        assertTrue(CommandHistorySecurity.looksSensitive("echo $API_KEY"))
+        assertTrue(CommandHistorySecurity.looksSensitive("echo \$API_KEY"))
         assertTrue(CommandHistorySecurity.looksSensitive("docker login --passwd hunter2"))
     }
 
