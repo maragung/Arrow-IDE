@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -37,7 +39,7 @@ android {
     val keystorePropertiesFile = rootProject.file("keystore/keystore.properties")
     val keystoreFile = rootProject.file("keystore/arrow-release.jks")
     if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
-        val keystoreProperties = java.util.Properties().apply {
+        val keystoreProperties = Properties().apply {
             keystorePropertiesFile.inputStream().use { load(it) }
         }
         signingConfigs {
