@@ -28,7 +28,7 @@ class WorkflowFileServiceTest {
     @Before
     fun setUp() {
         fake = FakeTransport()
-        service = WorkflowFileService(fake) { token }
+        service = WorkflowFileService(transport = fake, tokenProvider = { token })
     }
 
     private val listUrl = "https://api.github.com/repos/octocat/hello/contents/.github/workflows"
@@ -217,7 +217,7 @@ class WorkflowFileServiceTest {
 
     @Test
     fun notConnected_failsWithoutAnyRequest() = runBlocking {
-        val disconnected = WorkflowFileService(fake) { null }
+        val disconnected = WorkflowFileService(transport = fake, tokenProvider = { null })
 
         val result = disconnected.listWorkflowFiles(owner = "octocat", repo = "hello")
 
