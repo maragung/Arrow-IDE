@@ -173,7 +173,9 @@ class ArchiveReader(private val maxEntries: Int = 10_000) {
         RandomAccessFile(file, "r").use { raf ->
             val eocd = findEocd(raf) ?: return null
             var count = le16(eocd, 10)
-            if (count == 0xFFFF || le32(eocd, 16) == 0xFFFFFFFFL) count = Int.MAX_VALUE
+            if (count == 0xFFFF || le32(eocd, 16).toLong() and 0xFFFFFFFFL == 0xFFFFFFFFL) {
+                count = Int.MAX_VALUE
+            }
             val header = ByteArray(46)
             raf.seek(le32(eocd, 16).toLong() and 0xFFFFFFFFL)
             repeat(count) {
@@ -218,7 +220,7 @@ class ArchiveReader(private val maxEntries: Int = 10_000) {
 
     /** STORED copies verbatim; DEFLATE uses a raw [Inflater] (no zlib header). */
     private fun inflateBytes(data: ByteArray, size: Long, raw: Boolean): ByteArray? = try {
-        if (!raw) return data.copyOf(size.toInt())
+        if (!raw) data.copyOf(size.toInt()) else {
         val inflater = Inflater(true)
         inflater.setInput(data)
         val out = ByteArray(size.toInt())
@@ -300,7 +302,7 @@ class ArchiveReader(private val maxEntries: Int = 10_000) {
                     if (!readFully(input, data)) break
                     longName = cString(data, 0, minOf(size, data.size.toLong()).toInt())
                 }
-                TYPE_PAX_HEADER, TYPE_PAX_GLOBAL -> skipFully(input, dataBlocks * TAR_BLOCK_SIZE)
+                TYPE_PAX_HEADER, TYPE_PAX_GLOBAL -> skipFully(input, dataBlocks * TAR_BLOCK_SIZE.toLong())
                 else -> {
                     val name = longName ?: tarName(header)
                     longName = null
@@ -315,7 +317,7 @@ class ArchiveReader(private val maxEntries: Int = 10_000) {
                         }
                         break
                     }
-                    skipFully(input, dataBlocks * TAR_BLOCK_SIZE)
+                    skipFully(input, dataBlocks * TAR_BLOCK_SIZE.toLong())
                     if (entries.size >= maxEntries) break
                 }
             }

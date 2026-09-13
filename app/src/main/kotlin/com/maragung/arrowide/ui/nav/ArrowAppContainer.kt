@@ -181,6 +181,34 @@ class ArrowAppContainer(context: Context) {
     )
 
     /**
+     * Git plumbing (plan #10-#11): runs the toolchain's real git binary
+     * against the current project. Commit identity comes from settings
+     * (Settings → Git) and falls back to ~/.gitconfig when unset.
+     * Credentials come from the stored GitHub PAT (late-bound — reads the
+     * token store per operation, so connect/disconnect take effect
+     * immediately).
+     */
+    val gitService: GitService = GitService(
+        process = AndroidGitProcess(
+            homeDir = File(context.filesDir, "home"),
+            prefixDir = File(context.filesDir, "usr")
+        ),
+        homeDir = File(context.filesDir, "home"),
+        askpassCacheDir = File(context.cacheDir, "git-askpass"),
+        identityProvider = {
+            val s = latestSettings
+            val name = s.gitUserName
+            val email = s.gitUserEmail
+            if (!name.isNullOrBlank() && !email.isNullOrBlank()) {
+                GitIdentity(name, email)
+            } else {
+                null
+            }
+        },
+        credentialsProvider = githubService.gitCredentials()
+    )
+
+    /**
      * Codebase awareness (plan #31): gathers workspace/git/toolchain facts
      * for the status line. The version seam runs the REAL installed binary
      * from the toolchain prefix (`node --version`, `python --version`).
@@ -193,50 +221,23 @@ class ArrowAppContainer(context: Context) {
             val binaryName = when (toolId) {
                 "nodejs" -> "node"
                 "python" -> "python"
-                else -> return@runVersion null
+                else -> null
             }
-            val binary = File(File(context.filesDir, "usr/bin"), binaryName)
-            if (!binary.isFile) return@runVersion null
-            runCatching {
-                val process = ProcessBuilder(binary.absolutePath, "--version")
-                    .redirectErrorStream(true)
-                    .start()
-                val output = process.inputStream.bufferedReader().readText()
-                process.waitFor()
-                output.lineSequence().firstOrNull { it.isNotBlank() }
-            }.getOrNull()
+            val binary = binaryName
+                ?.let { File(File(context.filesDir, "usr/bin"), it) }
+                ?.takeIf { it.isFile }
+            if (binary != null) {
+                runCatching {
+                    val process = ProcessBuilder(binary.absolutePath, "--version")
+                        .redirectErrorStream(true)
+                        .start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    process.waitFor()
+                    output.lineSequence().firstOrNull { it.isNotBlank() }
+                }.getOrNull()
+            } else {
+                null
+            }
         },
     )
-
-    /**
-     * Git plumbing (plan #10-#11): runs the toolchain's real git binary
-     * against the current project. Commit identity comes from settings
-     * (Settings → Git) and falls back to ~/.gitconfig when unset.
-     * Credentials come from the stored GitHub PAT (late-bound — reads the
-     * token store per operation, so connect/disconnect take effect
-     * immediately).
-     */
-    val gitService: GitService
-
-    init {
-        gitService = GitService(
-            process = AndroidGitProcess(
-                homeDir = File(context.filesDir, "home"),
-                prefixDir = File(context.filesDir, "usr")
-            ),
-            homeDir = File(context.filesDir, "home"),
-            askpassCacheDir = File(context.cacheDir, "git-askpass"),
-            identityProvider = {
-                val s = latestSettings
-                val name = s.gitUserName
-                val email = s.gitUserEmail
-                if (!name.isNullOrBlank() && !email.isNullOrBlank()) {
-                    GitIdentity(name, email)
-                } else {
-                    null
-                }
-            },
-            credentialsProvider = githubService.gitCredentials()
-        )
-    }
 }
