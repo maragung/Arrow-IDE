@@ -220,18 +220,21 @@ class ArchiveReader(private val maxEntries: Int = 10_000) {
 
     /** STORED copies verbatim; DEFLATE uses a raw [Inflater] (no zlib header). */
     private fun inflateBytes(data: ByteArray, size: Long, raw: Boolean): ByteArray? = try {
-        if (!raw) data.copyOf(size.toInt()) else {
-        val inflater = Inflater(true)
-        inflater.setInput(data)
-        val out = ByteArray(size.toInt())
-        var outPos = 0
-        while (outPos < out.size && !inflater.finished()) {
-            val n = inflater.inflate(out, outPos, out.size - outPos)
-            if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) break
-            outPos += n
+        if (!raw) {
+            data.copyOf(size.toInt())
+        } else {
+            val inflater = Inflater(true)
+            inflater.setInput(data)
+            val out = ByteArray(size.toInt())
+            var outPos = 0
+            while (outPos < out.size && !inflater.finished()) {
+                val n = inflater.inflate(out, outPos, out.size - outPos)
+                if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) break
+                outPos += n
+            }
+            inflater.end()
+            if (outPos == out.size) out else out.copyOf(outPos)
         }
-        inflater.end()
-        if (outPos == out.size) out else out.copyOf(outPos)
     } catch (_: Exception) {
         null
     }
