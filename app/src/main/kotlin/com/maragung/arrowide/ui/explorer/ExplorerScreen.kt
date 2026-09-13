@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.maragung.arrowide.archive.isArchiveName
 import com.maragung.arrowide.workspace.FileEntry
 import com.maragung.arrowide.workspace.WorkspaceManager
 import java.io.File
@@ -72,7 +73,8 @@ import java.io.File
 fun ExplorerScreen(
     workspaceManager: WorkspaceManager,
     onOpenFile: (File) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenArchive: (File) -> Unit = {},
 ) {
     val viewModel: ExplorerViewModel = viewModel { ExplorerViewModel(workspaceManager) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -148,6 +150,9 @@ fun ExplorerScreen(
                                 name = row.entry.name,
                                 isDirectory = row.entry.isDirectory
                             )
+                        },
+                        onOpenArchive = { entry ->
+                            workspace?.let { ws -> onOpenArchive(File(ws, entry.path)) }
                         }
                     )
                 }
@@ -234,7 +239,8 @@ private fun FileTreeRow(
     onNewFile: (String) -> Unit,
     onNewFolder: (String) -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onOpenArchive: (FileEntry) -> Unit = {},
 ) {
     val entry = row.entry
     Row(
@@ -288,7 +294,8 @@ private fun FileTreeRow(
             onNewFile = onNewFile,
             onNewFolder = onNewFolder,
             onRename = onRename,
-            onDelete = onDelete
+            onDelete = onDelete,
+            onOpenArchive = onOpenArchive
         )
         Spacer(Modifier.width(8.dp))
     }
@@ -301,7 +308,8 @@ private fun RowActions(
     onNewFile: (String) -> Unit,
     onNewFolder: (String) -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onOpenArchive: (FileEntry) -> Unit = {},
 ) {
     Box {
         var menuOpen by remember { mutableStateOf(false) }
@@ -334,6 +342,16 @@ private fun RowActions(
                     onClick = {
                         menuOpen = false
                         onNewFolder(entry.path)
+                    }
+                )
+            }
+            if (!entry.isDirectory && isArchiveName(entry.name)) {
+                DropdownMenuItem(
+                    text = { Text("View archive") },
+                    leadingIcon = { Icon(Icons.Filled.FolderOpen, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        onOpenArchive(entry)
                     }
                 )
             }

@@ -59,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.git.GitOutcome
 import com.maragung.arrowide.ui.ai.AiScreen
+import com.maragung.arrowide.ui.archive.ArchiveViewerScreen
 import com.maragung.arrowide.ui.build.BuildScreen
 import com.maragung.arrowide.ui.editor.EditorScreen
 import com.maragung.arrowide.ui.explorer.ExplorerScreen
@@ -262,7 +263,8 @@ fun ArrowIDEApp(
                             },
                             onOpenTerminal = {
                                 navController.navigateTopLevel("terminal")
-                            }
+                            },
+                            codebaseStatusProvider = container.codebaseStatusProvider
                         )
                     }
                     composable("explorer") {
@@ -271,8 +273,21 @@ fun ArrowIDEApp(
                             onOpenFile = { file ->
                                 container.editorTabManager.openFile(file)
                                 navController.navigateTopLevel("editor")
+                            },
+                            onOpenArchive = { file ->
+                                navController.navigate("archive/${android.net.Uri.encode(file.absolutePath)}")
                             }
                         )
+                    }
+                    composable("archive/{path}") { entry ->
+                        val path = entry.arguments?.getString("path")
+                            ?.let(android.net.Uri::decode)
+                        if (path != null) {
+                            ArchiveViewerScreen(
+                                archive = java.io.File(path),
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
                     }
                     composable("editor") {
                         EditorScreen(tabManager = container.editorTabManager)

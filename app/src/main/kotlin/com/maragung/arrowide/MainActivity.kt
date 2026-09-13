@@ -70,6 +70,9 @@ class MainActivity : ComponentActivity() {
             if (existing != null) return existing
             val created = ArrowAppContainer(appContext)
             restoreEditorBuffers(created)
+            // Long-running dev servers keep running while the app is
+            // backgrounded via the keep-alive service (plan #26/#44).
+            created.terminalKeepAlive.observe(created.terminalSessionManager.sessions)
             cachedContainer = created
             return created
         }

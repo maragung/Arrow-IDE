@@ -4,11 +4,21 @@
     <!-- Toolchain downloads (plan #4/#6): HTTPS only, checksum-verified. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Keeps terminal sessions alive while backgrounded (plan #26/#44). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.ArrowIDE"
         android:allowBackup="true">
+
+        <!-- Foreground service showing the running-terminal-sessions
+             notification so long-running dev servers survive the app
+             being backgrounded (plan #26). -->
+        <service
+            android:name=".terminal.TerminalKeepAliveService"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"

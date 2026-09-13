@@ -5,6 +5,7 @@ import android.os.Build
 import com.maragung.arrowide.ai.OpenCodeService
 import com.maragung.arrowide.buildsystem.BuildSystemDetector
 import com.maragung.arrowide.buildsystem.ProjectEnvironment
+import com.maragung.arrowide.codebase.CodebaseStatusProvider
 import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.editor.EditorTabManager
 import com.maragung.arrowide.editor.RecoveryStore
@@ -16,6 +17,7 @@ import com.maragung.arrowide.github.GitHubService
 import com.maragung.arrowide.github.HttpUrlConnectionTransport
 import com.maragung.arrowide.terminal.ShellPtyFactory
 import com.maragung.arrowide.terminal.TerminalEnvironment
+import com.maragung.arrowide.terminal.TerminalKeepAliveController
 import com.maragung.arrowide.terminal.TerminalSessionManager
 import com.maragung.arrowide.packages.ProjectPackageManager
 import com.maragung.arrowide.process.PortScanner
@@ -67,6 +69,13 @@ class ArrowAppContainer(context: Context) {
     private var latestSettings = SettingsStore.AppSettings()
 
     private val containerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Keeps the foreground service (plan #26) in sync with the live terminal
+     * sessions, so `npm run dev` & co. survive the app being backgrounded.
+     */
+    val terminalKeepAlive: TerminalKeepAliveController =
+        TerminalKeepAliveController(context.applicationContext, containerScope)
 
     init {
         containerScope.launch {
@@ -169,6 +178,34 @@ class ArrowAppContainer(context: Context) {
      */
     val projectPackageManager: ProjectPackageManager = ProjectPackageManager(
         toolAvailable = { toolId -> toolchainManager.isAvailable(toolId) ?: false },
+    )
+
+    /**
+     * Codebase awareness (plan #31): gathers workspace/git/toolchain facts
+     * for the status line. The version seam runs the REAL installed binary
+     * from the toolchain prefix (`node --version`, `python --version`).
+     */
+    val codebaseStatusProvider: CodebaseStatusProvider = CodebaseStatusProvider(
+        gitService = gitService,
+        toolchainManager = toolchainManager,
+        buildSystemDetector = buildSystemDetector,
+        runVersion = { toolId ->
+            val binaryName = when (toolId) {
+                "nodejs" -> "node"
+                "python" -> "python"
+                else -> return@runVersion null
+            }
+            val binary = File(File(context.filesDir, "usr/bin"), binaryName)
+            if (!binary.isFile) return@runVersion null
+            runCatching {
+                val process = ProcessBuilder(binary.absolutePath, "--version")
+                    .redirectErrorStream(true)
+                    .start()
+                val output = process.inputStream.bufferedReader().readText()
+                process.waitFor()
+                output.lineSequence().firstOrNull { it.isNotBlank() }
+            }.getOrNull()
+        },
     )
 
     /**

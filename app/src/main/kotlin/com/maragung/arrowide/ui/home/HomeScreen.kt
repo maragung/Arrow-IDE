@@ -61,7 +61,8 @@ fun HomeScreen(
     onWorkspaceOpened: () -> Unit,
     onOpenTerminal: () -> Unit,
     modifier: Modifier = Modifier,
-    onNewFile: () -> Unit = {}
+    onNewFile: () -> Unit = {},
+    codebaseStatusProvider: CodebaseStatusProvider? = null,
 ) {
     val viewModel: HomeViewModel = viewModel { HomeViewModel(workspaceManager) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -100,6 +101,14 @@ fun HomeScreen(
                 onNewFile = onNewFile,
                 onClose = { viewModel.closeWorkspace() }
             )
+
+            // Git / build-system / toolchain facts (plan #31).
+            codebaseStatusProvider?.let { provider ->
+                CodebaseStatusCard(
+                    provider = provider,
+                    workspace = state.currentWorkspace,
+                )
+            }
 
             if (state.error != null && !showCreateDialog) {
                 Text(
