@@ -42,6 +42,20 @@ object ToolCatalog {
             optional = false,
         ),
         CatalogTool(
+            id = "bash",
+            packageName = "bash",
+            displayName = "Bash",
+            description = "Bourne-Again SHell — the default terminal shell once installed",
+            optional = false,
+        ),
+        CatalogTool(
+            id = "coreutils",
+            packageName = "coreutils",
+            displayName = "Coreutils",
+            description = "GNU core utilities (ls, cp, mv, cat, grep, ...)",
+            optional = false,
+        ),
+        CatalogTool(
             id = "clang",
             packageName = "clang",
             displayName = "Clang / LLVM",

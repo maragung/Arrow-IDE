@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -85,6 +86,9 @@ private const val LARGE_FILE_BYTES: Long = 1024L * 1024L
  *   re-read from disk);
  * - undo/redo wired to the editor's undo manager;
  * - a togglable find bar (next/previous match, case sensitivity toggle);
+ * - an "Ask AI" action (enabled while text is selected) that hands the
+ *   selected code plus the file name to [onAskAi] as a ready-made context
+ *   prompt;
  * - files larger than 1 MB open read-only with a warning banner;
  * - cursor position and live buffer text are continuously pushed into
  *   [tabManager], so the app shell can persist
@@ -94,12 +98,16 @@ private const val LARGE_FILE_BYTES: Long = 1024L * 1024L
  *   ViewModel; outlives this composable).
  * @param autoSaveOnTabSwitch when true, a dirty tab is saved automatically
  *   when the user switches away from it. Default off.
+ * @param onAskAi invoked with a context prompt (see [buildInlineAiPrompt])
+ *   built from the active file's name and the current editor selection.
+ *   Default no-op; the app shell wires this to AI chat navigation.
  */
 @Composable
 fun EditorScreen(
     tabManager: EditorTabManager,
     modifier: Modifier = Modifier,
-    autoSaveOnTabSwitch: Boolean = false
+    autoSaveOnTabSwitch: Boolean = false,
+    onAskAi: (prompt: String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -134,6 +142,10 @@ fun EditorScreen(
     // Current cursor of the editor (status line; also pushed to tabManager).
     var cursorLine by remember { mutableStateOf(0) }
     var cursorColumn by remember { mutableStateOf(0) }
+    // Whether the editor currently has a non-collapsed selection. The text
+    // itself is read from the live editor only when Ask AI is pressed, so
+    // selection events stay cheap.
+    var hasSelection by remember { mutableStateOf(false) }
 
     // Find bar state.
     var showFindBar by remember { mutableStateOf(false) }
@@ -207,12 +219,29 @@ fun EditorScreen(
             canUndo = editorState?.canUndo() == true,
             canRedo = editorState?.canRedo() == true,
             findActive = showFindBar,
+            canAskAi = hasSelection && activeTab != null,
             onSave = { saveActiveTab() },
             onUndo = { editorState?.undo() },
             onRedo = { editorState?.redo() },
             onToggleFind = {
                 showFindBar = !showFindBar
                 if (!showFindBar) editorState?.searcher?.stopSearch()
+            },
+            onAskAi = {
+                val editor = editorState
+                val tab = activeTab
+                // Read the live selection at press time (it may have changed
+                // since the last recomposition); a collapsed selection is a
+                // no-op.
+                if (editor != null && tab != null && editor.cursor.isSelected) {
+                    val selection = editor.text.substring(
+                        editor.cursor.left,
+                        editor.cursor.right
+                    )
+                    if (selection.isNotEmpty()) {
+                        onAskAi(buildInlineAiPrompt(tab.displayName, selection))
+                    }
+                }
             }
         )
 
@@ -300,6 +329,7 @@ fun EditorScreen(
                             tabManager.updateCursor(tabId, line, column)
                             cursorLine = line
                             cursorColumn = column
+                            hasSelection = cursor.isSelected
                         }
 
                         holder.editor = this
@@ -453,6 +483,29 @@ private fun saveTabNow(
     }
 }
 
+/** Selections longer than this are truncated in [buildInlineAiPrompt]. */
+private const val INLINE_AI_MAX_SELECTION_CHARS: Int = 8000
+
+/**
+ * Builds the Inline AI context prompt (plan #88) from the active file's name
+ * and the currently selected code: a "Context — file <name>:" header followed
+ * by the selected code inside a triple-backtick fence, ending with a blank
+ * line.
+ *
+ * This is the context block only — the AI screen pre-fills it into the chat
+ * input and the user's question is added on top. Selections longer than
+ * [INLINE_AI_MAX_SELECTION_CHARS] are truncated honestly: the marker
+ * "... (truncated)" is appended so the AI knows code was cut.
+ */
+internal fun buildInlineAiPrompt(fileName: String, selection: String): String {
+    val code = if (selection.length > INLINE_AI_MAX_SELECTION_CHARS) {
+        selection.take(INLINE_AI_MAX_SELECTION_CHARS) + "... (truncated)"
+    } else {
+        selection
+    }
+    return "Context — file $fileName:\n```\n$code\n```\n\n"
+}
+
 /** Bookkeeping attached to the single long-lived [CodeEditor]. Main-thread only. */
 private class EditorViewHolder {
     var editor: CodeEditor? = null
@@ -550,10 +603,12 @@ private fun EditorToolbar(
     canUndo: Boolean,
     canRedo: Boolean,
     findActive: Boolean,
+    canAskAi: Boolean,
     onSave: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onToggleFind: () -> Unit
+    onToggleFind: () -> Unit,
+    onAskAi: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -570,6 +625,9 @@ private fun EditorToolbar(
         }
         IconButton(onClick = onRedo, enabled = canRedo) {
             Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+        }
+        IconButton(onClick = onAskAi, enabled = canAskAi) {
+            Icon(Icons.Filled.AutoAwesome, contentDescription = "Ask AI about selection")
         }
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onToggleFind) {

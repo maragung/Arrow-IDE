@@ -2,6 +2,8 @@ package com.maragung.arrowide.ui.nav
 
 import android.content.Context
 import android.os.Build
+import com.maragung.arrowide.ai.AiActivityAudit
+import com.maragung.arrowide.ai.AiRequestLog
 import com.maragung.arrowide.ai.OpenCodeService
 import com.maragung.arrowide.buildsystem.BuildSystemDetector
 import com.maragung.arrowide.buildsystem.ProjectEnvironment
@@ -15,10 +17,14 @@ import com.maragung.arrowide.git.GitService
 import com.maragung.arrowide.github.AndroidKeystoreTokenStore
 import com.maragung.arrowide.github.GitHubService
 import com.maragung.arrowide.github.HttpUrlConnectionTransport
+import com.maragung.arrowide.github.TokenStore
+import com.maragung.arrowide.github.WorkflowFileService
 import com.maragung.arrowide.terminal.ShellPtyFactory
+import com.maragung.arrowide.terminal.ShellSelector
 import com.maragung.arrowide.terminal.TerminalEnvironment
 import com.maragung.arrowide.terminal.TerminalKeepAliveController
 import com.maragung.arrowide.terminal.TerminalSessionManager
+import com.maragung.arrowide.packages.AptCommandShim
 import com.maragung.arrowide.packages.ProjectPackageManager
 import com.maragung.arrowide.process.PortScanner
 import com.maragung.arrowide.process.ProcessManager
@@ -89,10 +95,21 @@ class ArrowAppContainer(context: Context) {
             prefixDir = File(context.filesDir, "usr"),
             tmpDir = File(context.cacheDir, "tmp")
         )
-        // History policy (plan #37) is read per session so Settings changes
-        // apply to every NEW terminal without restarting the app.
+        // History policy (plan #37) and the shell choice are read per
+        // session so Settings changes apply to every NEW terminal without
+        // restarting the app. Bash is used as soon as it is installed
+        // (userspace parity); before that the system sh runs.
         terminalSessionManager = TerminalSessionManager(
-            ShellPtyFactory(environment, historyModeProvider = { latestSettings.historyMode })
+            ShellPtyFactory(
+                environment,
+                shellProvider = {
+                    ShellSelector.defaultShell(
+                        prefixDir = environment.prefixDir,
+                        preferBash = latestSettings.preferBash,
+                    )
+                },
+                historyModeProvider = { latestSettings.historyMode },
+            )
         )
     }
 
@@ -122,8 +139,11 @@ class ArrowAppContainer(context: Context) {
      * token store and is handed to git per operation via [gitCredentials]
      * (plan #38) — never stored in remote URLs or git config.
      */
+    /** Keystore-backed PAT store, shared by the GitHub services (plan #12). */
+    private val githubTokenStore: TokenStore = AndroidKeystoreTokenStore(context)
+
     val githubService: GitHubService = GitHubService(
-        tokenStore = AndroidKeystoreTokenStore(context),
+        tokenStore = githubTokenStore,
         transport = HttpUrlConnectionTransport()
     )
 
@@ -178,6 +198,37 @@ class ArrowAppContainer(context: Context) {
      */
     val projectPackageManager: ProjectPackageManager = ProjectPackageManager(
         toolAvailable = { toolId -> toolchainManager.isAvailable(toolId) ?: false },
+    )
+
+    /**
+     * AI request log (plan #92): bounded in-memory ring of every OpenCode
+     * HTTP exchange, shown on the AI diagnostics screen. Nothing is
+     * persisted; authorization headers are never captured.
+     */
+    val aiRequestLog: AiRequestLog = AiRequestLog()
+
+    /** Agent activity audit (plan #97), persisted under filesDir/ai/. */
+    val aiActivityAudit: AiActivityAudit =
+        AiActivityAudit(dir = File(context.filesDir, "ai"))
+
+    /** `apt`-style queue shim (userspace parity): real sh scripts in usr/bin. */
+    val aptCommandShim: AptCommandShim =
+        AptCommandShim(prefixDir = File(context.filesDir, "usr"))
+
+    init {
+        // Make `apt`/`apt-get` available in every shell (userspace parity);
+        // package operations are applied from the Tools screen.
+        containerScope.launch { runCatching { aptCommandShim.ensureInstalled() } }
+    }
+
+    /**
+     * Workflow file editing (plan #17): fetch / save `.github/workflows/*`
+     * through the GitHub contents API. Uses its own transport so it can
+     * wrap the request log independently of the main GitHub service.
+     */
+    val workflowFileService: WorkflowFileService = WorkflowFileService(
+        transport = HttpUrlConnectionTransport(),
+        tokenProvider = { githubTokenStore.get() },
     )
 
     /**

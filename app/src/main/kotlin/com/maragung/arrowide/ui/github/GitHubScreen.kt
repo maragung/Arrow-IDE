@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
@@ -61,13 +62,15 @@ import com.maragung.arrowide.github.GitHubResult
 import com.maragung.arrowide.github.GitHubService
 import com.maragung.arrowide.github.GithubRepo
 import com.maragung.arrowide.github.GithubUser
+import com.maragung.arrowide.github.WorkflowFileService
 import java.io.File
 
 /**
- * GitHub screen (plan #13-#16, #19): token-based connect flow, the account
+ * GitHub screen (plan #13-#17, #19): token-based connect flow, the account
  * hub, and internal navigation to repositories (browse / detail / clone /
- * create / delete), Actions (runs, jobs, logs, run-workflow) and the log
- * viewer.
+ * create / delete), Actions (runs, jobs, logs, run-workflow), the log
+ * viewer, and the workflow file browser/editor (plan #17, shown only when
+ * the caller wires a [WorkflowFileService]).
  *
  * The Personal Access Token lives only in the connect field: it is masked,
  * cleared immediately after a successful connect, and never echoed back in
@@ -79,6 +82,7 @@ fun GitHubScreen(
     projectsDir: File,
     onProjectCloned: (File) -> Unit,
     cloneRepository: suspend (url: String, destDir: File) -> Boolean,
+    workflowFiles: WorkflowFileService? = null,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -91,6 +95,12 @@ fun GitHubScreen(
     // Selected repository of the Actions page, hoisted so it survives
     // navigating into a run detail and back.
     var actionsRepo by remember { mutableStateOf<GithubRepo?>(null) }
+    // Workflow browser/editor (plan #17): overlays the page model (GitHubPage
+    // is not extended), so their back handling is separate. The selected
+    // repository is hoisted like [actionsRepo].
+    var workflowsOpen by remember { mutableStateOf(false) }
+    var workflowsRepo by remember { mutableStateOf<GithubRepo?>(null) }
+    var workflowEditor by remember { mutableStateOf<WorkflowEditorTarget?>(null) }
 
     fun reportError(detail: String) {
         error = detail
@@ -109,6 +119,15 @@ fun GitHubScreen(
     // System back follows the page hierarchy (pages also offer a back arrow).
     BackHandler(enabled = page !is GitHubPage.Account && page !is GitHubPage.Connect) {
         page = parentPage(page)
+    }
+
+    // The workflow browser and editor overlay the page model; system back
+    // closes the topmost one first (the last enabled handler wins).
+    BackHandler(enabled = workflowsOpen && workflowFiles != null) {
+        workflowsOpen = false
+    }
+    BackHandler(enabled = workflowEditor != null) {
+        workflowEditor = null
     }
 
     val ctx = GitHubPageContext(
@@ -134,9 +153,17 @@ fun GitHubScreen(
             onUserLoaded = { user = it },
             onSessionExpired = { page = GitHubPage.Connect },
             onNavigate = { page = it },
+            onOpenWorkflows = if (workflowFiles != null) {
+                { workflowsOpen = true }
+            } else {
+                null
+            },
             onDisconnected = {
                 user = null
                 actionsRepo = null
+                workflowsOpen = false
+                workflowsRepo = null
+                workflowEditor = null
                 page = GitHubPage.Connect
             }
         )
@@ -192,6 +219,32 @@ fun GitHubScreen(
             job = current.job,
             onBack = { page = parentPage(page) }
         )
+        }
+
+        // Workflow browser/editor (plan #17), drawn over the current page.
+        // Only reachable (and only rendered) when the caller wired a service.
+        val workflowService = workflowFiles
+        if (workflowsOpen && workflowService != null) {
+            WorkflowsPage(
+                ctx = ctx,
+                workflowFiles = workflowService,
+                selectedRepo = workflowsRepo,
+                onSelectRepo = { workflowsRepo = it },
+                onBack = { workflowsOpen = false },
+                onOpenFile = { repo, file ->
+                    workflowEditor = WorkflowEditorTarget(repo, file)
+                }
+            )
+        }
+        val editorTarget = workflowEditor
+        if (editorTarget != null && workflowService != null) {
+            WorkflowEditorPage(
+                ctx = ctx,
+                workflowFiles = workflowService,
+                repo = editorTarget.repo,
+                file = editorTarget.file,
+                onBack = { workflowEditor = null }
+            )
         }
     }
 }
@@ -386,7 +439,9 @@ private fun ConnectPage(
 /**
  * Connected account hub (plan #13): account header with letter avatar,
  * disconnect (with confirmation), and navigation cards for Repositories,
- * Actions and New repository.
+ * Actions, New repository, and Workflow files (plan #17 — the card only
+ * appears when [onOpenWorkflows] is non-null, i.e. a WorkflowFileService
+ * was wired into the screen).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -396,6 +451,7 @@ private fun AccountPage(
     onUserLoaded: (GithubUser) -> Unit,
     onSessionExpired: () -> Unit,
     onNavigate: (GitHubPage) -> Unit,
+    onOpenWorkflows: (() -> Unit)? = null,
     onDisconnected: () -> Unit
 ) {
     var loading by remember { mutableStateOf(user == null) }
@@ -509,6 +565,16 @@ private fun AccountPage(
                     subtitle = "Workflow runs, jobs and logs",
                     onClick = { onNavigate(GitHubPage.Actions) }
                 )
+            }
+            if (onOpenWorkflows != null) {
+                item(key = "nav-workflows") {
+                    NavigationCard(
+                        icon = Icons.Filled.Description,
+                        title = "Workflow files",
+                        subtitle = "View and edit .github/workflows files",
+                        onClick = onOpenWorkflows
+                    )
+                }
             }
             item(key = "nav-new") {
                 NavigationCard(

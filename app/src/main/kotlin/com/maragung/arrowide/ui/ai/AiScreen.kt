@@ -1,6 +1,7 @@
 package com.maragung.arrowide.ui.ai
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,6 +48,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -64,12 +67,16 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.maragung.arrowide.ai.AiActivityAudit
+import com.maragung.arrowide.ai.AiActivityKind
 import com.maragung.arrowide.ai.AiFileDiff
 import com.maragung.arrowide.ai.AiMessage
 import com.maragung.arrowide.ai.AiPermissionRequest
 import com.maragung.arrowide.ai.AiProvider
 import com.maragung.arrowide.ai.AiResult
 import com.maragung.arrowide.ai.AiSessionInfo
+import com.maragung.arrowide.ai.AiUsage
+import com.maragung.arrowide.ai.ModelRouter
 import com.maragung.arrowide.ai.OpenCodeClient
 import com.maragung.arrowide.ai.OpenCodeInstallState
 import com.maragung.arrowide.ai.OpenCodeReleaseInfo
@@ -93,12 +100,21 @@ import kotlinx.serialization.json.put
  * BackHandler); every long operation goes through [AiController] with busy
  * flags and error card + snackbar reporting. Live updates come from the
  * server's event stream; a bounded poll after each send backs it up.
+ *
+ * Optional integrations: [initialPrompt] prefills the chat input once
+ * (plan #88 support), [onOpenDiagnostics] opens the AI diagnostics screen
+ * from the Providers page (plan #92/#97), and [activityAudit] records real
+ * agent activity (user messages, permission decisions, tool runs — plan
+ * #97). All default to disabled/absent.
  */
 @Composable
 fun AiScreen(
     ai: OpenCodeService,
     workspace: File?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialPrompt: String? = null,
+    onOpenDiagnostics: () -> Unit = {},
+    activityAudit: AiActivityAudit? = null
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -106,6 +122,13 @@ fun AiScreen(
     var page by remember { mutableStateOf(initialAiPage(ai)) }
     var error by remember { mutableStateOf<String?>(null) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
+
+    // Model routing (plan #57): the per-kind model map is loaded into
+    // ModelRouter.routes by the settings layer; until that screen exists
+    // the map stays empty, routeFor() returns null and auto-routing falls
+    // back to the manually selected model — never a fabricated model id.
+    val modelRouter = remember { ModelRouter() }
+    var autoRouting by remember { mutableStateOf(false) }
 
     fun reportError(detail: String) {
         error = detail
@@ -140,9 +163,20 @@ fun AiScreen(
                 ctx = ctx,
                 ai = ai,
                 workspace = workspace,
+                initialPrompt = initialPrompt,
+                activityAudit = activityAudit,
+                autoRouting = autoRouting,
+                modelRouter = modelRouter,
                 onOpenProviders = { page = AiPage.Providers }
             )
-            AiPage.Providers -> ProvidersPage(ctx, ai, onBack = { page = AiPage.Chat })
+            AiPage.Providers -> ProvidersPage(
+                ctx = ctx,
+                ai = ai,
+                autoRouting = autoRouting,
+                onAutoRoutingChange = { autoRouting = it },
+                onOpenDiagnostics = onOpenDiagnostics,
+                onBack = { page = AiPage.Chat }
+            )
         }
     }
 }
@@ -356,6 +390,10 @@ private fun ChatPage(
     ctx: AiPageContext,
     ai: OpenCodeService,
     workspace: File?,
+    initialPrompt: String?,
+    activityAudit: AiActivityAudit?,
+    autoRouting: Boolean,
+    modelRouter: ModelRouter,
     onOpenProviders: () -> Unit
 ) {
     val serverState by ai.serverState.collectAsStateWithLifecycle()
@@ -379,8 +417,25 @@ private fun ChatPage(
     var input by remember { mutableStateOf("") }
     var diffFor by remember { mutableStateOf<AiMessage?>(null) }
     var diffContent by remember { mutableStateOf<List<AiFileDiff>?>(null) }
+    // Token usage of the latest streamed reply (plan #77) — only ever set
+    // from counts the server actually reported.
+    var lastUsage by remember { mutableStateOf<AiUsage?>(null) }
+    // Audit dedup (plan #97): tool parts already recorded, keyed by
+    // message id + part index + tool name (parts carry no id).
+    val auditedToolParts = remember { HashSet<String>() }
+    var promptPrefilled by remember { mutableStateOf(false) }
 
     val serverReady = serverError == null && serverState is OpenCodeServerState.Ready
+
+    // Prefill the input from the caller's initial prompt exactly once
+    // (plan #88 support): the flag stops re-composition from re-appending
+    // and leaves the text editable before sending.
+    LaunchedEffect(initialPrompt) {
+        if (!promptPrefilled && !initialPrompt.isNullOrBlank()) {
+            input = initialPrompt
+            promptPrefilled = true
+        }
+    }
 
     /** Loads the messages of [sessionId] and refreshes the streaming flag. */
     suspend fun refreshMessages(client: OpenCodeClient, sessionId: String) {
@@ -460,6 +515,7 @@ private fun ChatPage(
         messages = emptyList()
         permissions = emptyList()
         streaming = false
+        lastUsage = null
         loadingMessages = true
         ctx.controller.launchAction("load messages") {
             try {
@@ -508,6 +564,7 @@ private fun ChatPage(
                 messages = emptyList()
                 permissions = emptyList()
                 streaming = false
+                lastUsage = null
                 selectedSession?.let { next ->
                     loadingMessages = true
                     try {
@@ -560,13 +617,16 @@ private fun ChatPage(
     }
 
     fun send() {
-        val text = input.trim()
-        if (text.isEmpty() || sending || streaming) return
+        val rawText = input.trim()
+        if (rawText.isEmpty() || sending || streaming) return
         val currentClient = ai.client()
         if (currentClient == null) {
             ctx.controller.reportDetail("AI server is not running.")
             return
         }
+        // Slash commands (plan #87) are expanded into their full prompt
+        // before sending; plain text passes through unchanged.
+        val text = chatPromptForSend(rawText)
         input = ""
         sending = true
         ctx.controller.launchAction("send message") {
@@ -577,22 +637,40 @@ private fun ChatPage(
                         currentClient.createSession()
                     }
                     if (session == null) {
-                        // Let the user retry without retyping.
-                        input = text
+                        // Let the user retry without retyping (the raw
+                        // input, not the expanded prompt).
+                        input = rawText
                         return@launchAction
                     }
                     sessions = listOf(session) + sessions.filterNot { it.id == session.id }
                     selectedSession = session
                 }
+                // Model routing (plan #57): classify the message and use
+                // the model configured for that kind; an unconfigured kind
+                // falls back to the manually selected model — the router
+                // never fabricates a model id.
+                val modelForSend =
+                    if (autoRouting) {
+                        modelRouter.routeFor(modelRouter.classify(text)) ?: selectedModel
+                    } else {
+                        selectedModel
+                    }
                 when (
                     val result = currentClient.sendMessage(
                         session.id,
                         text,
-                        model = selectedModel,
+                        model = modelForSend,
                         agent = agentOption.id
                     )
                 ) {
                     is AiResult.Ok -> {
+                        // Audit hook (plan #97): the server accepted the
+                        // user's message. detail never throws.
+                        activityAudit?.record(
+                            session.id,
+                            AiActivityKind.USER_MESSAGE,
+                            text.take(120)
+                        )
                         streaming = true
                         pollUntilSettled(currentClient, session.id)
                     }
@@ -638,8 +716,20 @@ private fun ChatPage(
                         rememberChoice
                     )
                 ) {
-                    is AiResult.Ok ->
+                    is AiResult.Ok -> {
                         permissions = permissions.filterNot { it.id == permission.id }
+                        // Audit hook (plan #97): what the user decided.
+                        activityAudit?.record(
+                            permission.sessionId,
+                            if (allow) {
+                                AiActivityKind.PERMISSION_GRANTED
+                            } else {
+                                AiActivityKind.PERMISSION_DENIED
+                            },
+                            permission.title ?: permission.description
+                                ?: permission.pattern ?: permission.id
+                        )
+                    }
                     is AiResult.Error ->
                         ctx.controller.report("respond to permission", result)
                 }
@@ -671,6 +761,10 @@ private fun ChatPage(
                         }
                     }
                     eventName.contains("message", ignoreCase = true) -> {
+                        // Token usage (plan #77): the parsed message models
+                        // drop token counts, but the raw event payload may
+                        // carry them — only real counts are ever shown.
+                        usageFromEventPayload(dataJson)?.let { lastUsage = it }
                         val session = selectedSession ?: return@events
                         val now = System.currentTimeMillis()
                         if (now - lastRefresh.get() >= 700) {
@@ -699,6 +793,42 @@ private fun ChatPage(
             // The event stream died unexpectedly; the poll after each send
             // and the refresh action keep the chat usable.
         }
+    }
+
+    /**
+     * Audit hook (plan #97): records each agent tool invocation once, when
+     * its message part reaches a terminal state. Keyed by message id +
+     * part index + tool name so the repeated message refreshes during
+     * streaming do not duplicate entries.
+     *
+     * FILE_EDIT is deliberately NOT recorded: the streamed parts carry no
+     * file-edit information (the diff endpoint is queried on demand by the
+     * "Changes" action), so there is nothing real to record yet.
+     */
+    fun recordToolRuns(currentMessages: List<AiMessage>) {
+        val audit = activityAudit ?: return
+        val sessionId = selectedSession?.id ?: ""
+        currentMessages.forEach { message ->
+            message.parts.forEachIndexed { index, part ->
+                if (part.type == "tool" &&
+                    (part.state == "completed" || part.state == "error")
+                ) {
+                    val key = "${message.id}#$index#${part.toolName ?: ""}"
+                    if (auditedToolParts.add(key)) {
+                        audit.record(
+                            sessionId,
+                            AiActivityKind.TOOL_RUN,
+                            "Ran ${part.toolName ?: "tool"} (${part.state})"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Runs whenever the transcript changes (settle polls + live events).
+    LaunchedEffect(signatureOf(messages)) {
+        recordToolRuns(messages)
     }
 
     // Load the diff for the message whose "Changes" action was tapped.
@@ -885,6 +1015,52 @@ private fun ChatPage(
                         }
                     }
 
+                    // Token usage of the latest streamed reply (plan #77):
+                    // shown only when the server actually reported counts.
+                    val usage = lastUsage
+                    if (usage != null) {
+                        Text(
+                            text = "tokens: in ${usage.inputTokens} / " +
+                                "out ${usage.outputTokens}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, top = 2.dp)
+                        )
+                    }
+
+                    // Slash-command completion (plan #87): chips while the
+                    // input is an unfinished "/" token; tapping completes
+                    // the input to the command (plus a space for arguments).
+                    val suggestions = slashSuggestions(input)
+                    if (suggestions.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = 16.dp, end = 16.dp,
+                                    bottom = 4.dp
+                                )
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            suggestions.forEach { command ->
+                                AssistChip(
+                                    onClick = { input = command.command + " " },
+                                    label = {
+                                        Text(
+                                            text = command.command + " · " +
+                                                command.description,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     // Input row: send on the send key, Stop while streaming.
                     Row(
                         modifier = Modifier
@@ -973,6 +1149,9 @@ private fun ChatPage(
 private fun ProvidersPage(
     ctx: AiPageContext,
     ai: OpenCodeService,
+    autoRouting: Boolean,
+    onAutoRoutingChange: (Boolean) -> Unit,
+    onOpenDiagnostics: () -> Unit,
     onBack: () -> Unit
 ) {
     var providers by remember { mutableStateOf<List<AiProvider>?>(null) }
@@ -980,6 +1159,7 @@ private fun ProvidersPage(
     var expandedId by remember { mutableStateOf<String?>(null) }
     var keyInput by remember { mutableStateOf("") }
     var keyVisible by remember { mutableStateOf(false) }
+    var headersInput by remember { mutableStateOf("") }
     var savingFor by remember { mutableStateOf<String?>(null) }
 
     fun load() {
@@ -1013,9 +1193,17 @@ private fun ProvidersPage(
             try {
                 // Built with a JSON builder so the key is always escaped
                 // correctly; the value is never logged or echoed (plan #67).
+                // Custom headers (plan #91) ride along in the same auth
+                // object as a map, one "Name: value" line per header.
                 val body = buildJsonObject {
                     put("type", "api")
                     put("key", key)
+                    val headers = parseHeaderLines(headersInput)
+                    if (headers.isNotEmpty()) {
+                        put("headers", buildJsonObject {
+                            headers.forEach { (name, value) -> put(name, value) }
+                        })
+                    }
                 }.toString()
                 when (val result = currentClient.setProviderAuth(provider.id, body)) {
                     is AiResult.Ok -> {
@@ -1046,7 +1234,14 @@ private fun ProvidersPage(
                 title = "AI Providers",
                 onBack = onBack,
                 onRefresh = { load() },
-                refreshEnabled = savingFor == null
+                refreshEnabled = savingFor == null,
+                extraActions = {
+                    // Subtle entry to the AI diagnostics screen
+                    // (plan #92/#97).
+                    TextButton(onClick = onOpenDiagnostics) {
+                        Text("Diagnostics")
+                    }
+                }
             )
         }
     ) { padding ->
@@ -1061,6 +1256,44 @@ private fun ProvidersPage(
             ctx.error?.let { message ->
                 item(key = "error") {
                     AiErrorCard(message = message, onDismiss = ctx.dismissError)
+                }
+            }
+
+            // Auto model routing (plan #57): when enabled, each sent
+            // message is classified (chat / coding / refactor / debug) and
+            // sent to the model configured for that kind; kinds with no
+            // configured route fall back to the selected model.
+            item(key = "auto-routing") {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = 16.dp, top = 12.dp,
+                                end = 16.dp, bottom = 12.dp
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Auto model routing",
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Text(
+                                text = "Classifies each message (chat, coding, " +
+                                    "refactor, debug) and sends it to the model " +
+                                    "configured for that kind. Kinds without a " +
+                                    "configured route use the selected model.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = autoRouting,
+                            onCheckedChange = onAutoRoutingChange
+                        )
+                    }
                 }
             }
 
@@ -1092,9 +1325,12 @@ private fun ProvidersPage(
                         onKeyChange = { keyInput = it },
                         keyVisible = keyVisible,
                         onToggleKeyVisibility = { keyVisible = !keyVisible },
+                        headersValue = headersInput,
+                        onHeadersChange = { headersInput = it },
                         onToggleExpanded = {
                             keyInput = ""
                             keyVisible = false
+                            headersInput = ""
                             expandedId = if (expandedId == provider.id) null else provider.id
                         },
                         onSave = { saveKey(provider) }
@@ -1117,6 +1353,8 @@ private fun ProviderCard(
     onKeyChange: (String) -> Unit,
     keyVisible: Boolean,
     onToggleKeyVisibility: () -> Unit,
+    headersValue: String,
+    onHeadersChange: (String) -> Unit,
     onToggleExpanded: () -> Unit,
     onSave: () -> Unit
 ) {
@@ -1205,6 +1443,23 @@ private fun ProviderCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = headersValue,
+                    onValueChange = onHeadersChange,
+                    label = { Text("Custom headers (optional, plan #91)") },
+                    placeholder = { Text("X-Org-Id: my-org\nHTTP-Referer: https://myapp.dev") },
+                    enabled = !busy,
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "One \"Name: value\" per line; sent with every request " +
+                        "to this provider.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.height(8.dp))
                 Button(
                     onClick = onSave,
@@ -1223,3 +1478,18 @@ private fun ProviderCard(
         }
     }
 }
+
+/**
+ * Parses "Name: value" lines (plan #91 custom headers) into pairs; blank
+ * lines and lines without a colon are ignored, names/values are trimmed.
+ */
+internal fun parseHeaderLines(input: String): List<Pair<String, String>> =
+    input.lineSequence()
+        .mapNotNull { line ->
+            val colon = line.indexOf(':')
+            if (colon <= 0) return@mapNotNull null
+            val name = line.substring(0, colon).trim()
+            val value = line.substring(colon + 1).trim()
+            if (name.isEmpty() || value.isEmpty()) null else name to value
+        }
+        .toList()

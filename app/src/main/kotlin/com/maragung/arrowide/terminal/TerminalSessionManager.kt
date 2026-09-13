@@ -38,14 +38,18 @@ interface PtyFactory {
  *                       validated with [PathSafety] (blocks path traversal
  *                       and symlink escapes); directories outside it (such
  *                       as the terminal home) are used as-is
- * @param shell          binary to execute
+ * @param shellProvider supplies the binary to execute; late-bound (called
+ *                      per session) so shell changes — e.g. installing bash
+ *                      (plan #4/#5) — apply to new sessions without
+ *                      rebuilding the factory
  */
 class ShellPtyFactory(
     private val environment: TerminalEnvironment,
     private val workspaceRoot: File? = null,
-    private val shell: String = TerminalEnvironment.DEFAULT_SHELL,
     /** Late-bound so Settings changes apply to NEW sessions (plan #37). */
     private val historyModeProvider: () -> HistoryMode = { HistoryMode.NORMAL },
+    /** Late-bound so shell preference applies to NEW sessions (plan #4/#5). */
+    private val shellProvider: () -> String = { TerminalEnvironment.DEFAULT_SHELL },
 ) : PtyFactory {
 
     private val idCounter = AtomicInteger(0)
@@ -56,6 +60,7 @@ class ShellPtyFactory(
     override fun createSession(cwd: File, rows: Int, cols: Int): TerminalSession {
         environment.ensureDirectories()
         val resolvedCwd = resolveCwd(cwd)
+        val shell = shellProvider()
         val argv = arrayOf(shell)
         // History policy (plan #37) is applied through the environment:
         // the app-private histfile stays inside the sandbox.

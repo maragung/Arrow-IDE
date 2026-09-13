@@ -35,7 +35,9 @@ class SettingsStore(private val context: Context) {
         val historyMode: HistoryMode = HistoryMode.NORMAL,
         /** Git commit identity (plan #10); nulls fall back to ~/.gitconfig. */
         val gitUserName: String? = null,
-        val gitUserEmail: String? = null
+        val gitUserEmail: String? = null,
+        /** Prefer bash over the system shell for new sessions (plan #4/#5). */
+        val preferBash: Boolean = true
     )
 
     val settings: Flow<AppSettings> = context.arrowDataStore.data
@@ -63,6 +65,7 @@ class SettingsStore(private val context: Context) {
             val gitEmail = updated.gitUserEmail?.takeIf { it.isNotBlank() }
             if (gitEmail != null) preferences[GIT_USER_EMAIL] = gitEmail
             else preferences.remove(GIT_USER_EMAIL)
+            preferences[PREFER_BASH] = updated.preferBash
         }
     }
 
@@ -80,7 +83,8 @@ class SettingsStore(private val context: Context) {
                 ?.let { stored -> runCatching { HistoryMode.valueOf(stored) }.getOrNull() }
                 ?: HistoryMode.NORMAL,
             gitUserName = this[GIT_USER_NAME]?.takeIf { it.isNotBlank() },
-            gitUserEmail = this[GIT_USER_EMAIL]?.takeIf { it.isNotBlank() }
+            gitUserEmail = this[GIT_USER_EMAIL]?.takeIf { it.isNotBlank() },
+            preferBash = this[PREFER_BASH] ?: true
         )
 
     private companion object {
@@ -93,5 +97,6 @@ class SettingsStore(private val context: Context) {
         val HISTORY_MODE = stringPreferencesKey("history_mode")
         val GIT_USER_NAME = stringPreferencesKey("git_user_name")
         val GIT_USER_EMAIL = stringPreferencesKey("git_user_email")
+        val PREFER_BASH = booleanPreferencesKey("prefer_bash")
     }
 }

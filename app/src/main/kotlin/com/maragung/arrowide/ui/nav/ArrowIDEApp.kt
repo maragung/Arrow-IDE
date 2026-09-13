@@ -39,6 +39,7 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +59,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maragung.arrowide.data.SettingsStore
 import com.maragung.arrowide.git.GitOutcome
+import com.maragung.arrowide.ui.ai.AiDiagnosticsScreen
 import com.maragung.arrowide.ui.ai.AiScreen
 import com.maragung.arrowide.ui.archive.ArchiveViewerScreen
 import com.maragung.arrowide.ui.build.BuildScreen
@@ -131,6 +133,10 @@ fun ArrowIDEApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     var showMoreSheet by remember { mutableStateOf(false) }
+    // Inline AI hand-off (plan #88): the editor sets the selected-code
+    // context block, navigation switches to the AI tab, and the AI screen
+    // consumes it once into its chat input.
+    var pendingAiPrompt by remember { mutableStateOf<String?>(null) }
     val primary = destinations.filter { it.route in primaryRoutes }
     val secondary = destinations.filter { it.route !in primaryRoutes }
 
@@ -290,7 +296,15 @@ fun ArrowIDEApp(
                         }
                     }
                     composable("editor") {
-                        EditorScreen(tabManager = container.editorTabManager)
+                        EditorScreen(
+                            tabManager = container.editorTabManager,
+                            // Inline AI (plan #88): the selected code becomes the
+                            // context block pre-filled into the AI chat input.
+                            onAskAi = { prompt ->
+                                pendingAiPrompt = prompt
+                                navController.navigateTopLevel("ai")
+                            },
+                        )
                     }
                     composable("terminal") {
                         // New sessions open in the current workspace (plan #23);
@@ -388,6 +402,9 @@ fun ArrowIDEApp(
                         GitHubScreen(
                             github = container.githubService,
                             projectsDir = container.workspaceManager.projectsDir,
+                            // Workflow file editing (plan #17): fetch / save
+                            // .github/workflows/* through the contents API.
+                            workflowFiles = container.workflowFileService,
                             onProjectCloned = { project ->
                                 container.workspaceManager.setCurrentWorkspace(project)
                                 navController.navigateTopLevel("explorer")
@@ -405,7 +422,21 @@ fun ArrowIDEApp(
                         // served locally; the agent works on the open workspace.
                         val workspace by container.workspaceManager.currentWorkspace
                             .collectAsState()
-                        AiScreen(ai = container.openCodeService, workspace = workspace)
+                        // Inline AI (plan #88): hand off the editor selection
+                        // once, then clear it so manual visits start clean.
+                        val prompt = pendingAiPrompt
+                        LaunchedEffect(prompt) {
+                            if (prompt != null) pendingAiPrompt = null
+                        }
+                        AiScreen(
+                            ai = container.openCodeService,
+                            workspace = workspace,
+                            initialPrompt = prompt,
+                            activityAudit = container.aiActivityAudit,
+                            onOpenDiagnostics = {
+                                navController.navigate("ai-diagnostics")
+                            },
+                        )
                     }
                     composable("build") {
                         // Build & one-tap actions (plan #24 + #33): commands
@@ -472,8 +503,22 @@ fun ArrowIDEApp(
                         // Local secrets manager (plan #21), opened from Settings.
                         SecretsScreen(store = container.secretStore)
                     }
+                    composable("ai-diagnostics") {
+                        // AI request log (plan #92) + activity audit (plan #97).
+                        AiDiagnosticsScreen(
+                            requestLog = container.aiRequestLog,
+                            activityAudit = container.aiActivityAudit,
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
                     composable("tools") {
-                        ToolsScreen(manager = container.toolchainManager)
+                        // Toolchain Manager + apt queue bridge (userspace parity):
+                        // queued `apt install ...` commands from the shell are
+                        // applied here against the real toolchain.
+                        ToolsScreen(
+                            manager = container.toolchainManager,
+                            aptShim = container.aptCommandShim,
+                        )
                     }
                     composable("settings") {
                         SettingsScreen(

@@ -161,6 +161,31 @@ fun SettingsScreen(
                     }
                 )
             }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 16.dp)
+                ) {
+                    Text("Prefer bash shell (when installed)")
+                    Text(
+                        text = "New terminals use the installed bash instead of the system sh",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = settings.preferBash,
+                    onCheckedChange = { checked ->
+                        update { it.copy(preferBash = checked) }
+                    }
+                )
+            }
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
