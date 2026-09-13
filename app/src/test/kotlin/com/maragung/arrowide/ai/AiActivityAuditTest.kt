@@ -17,11 +17,13 @@ class AiActivityAuditTest {
 
     @Test
     fun entriesSurviveRoundTripAndReload() {
-        val audit = audit()
+        val dir = tmp.newFolder()
+        val audit = AiActivityAudit(dir = dir)
         audit.record("s1", AiActivityKind.FILE_EDIT, "Edited src/Main.kt")
         audit.record("s1", AiActivityKind.PERMISSION_GRANTED, "bash: npm test")
 
-        val reloaded = audit()
+        // A NEW instance over the SAME directory reads the persisted log.
+        val reloaded = AiActivityAudit(dir = dir)
         val entries = reloaded.entries()
         assertEquals(2, entries.size)
         assertEquals(AiActivityKind.FILE_EDIT, entries[0].kind)

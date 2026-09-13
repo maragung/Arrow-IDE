@@ -17,9 +17,14 @@ class AiChatInputTest {
 
     @Test
     fun suggestionsForUnfinishedSlashToken() {
+        // Only /review starts with "/rev" (prefix match, not substring).
         assertEquals(
-            listOf("/review", "/refactor"),
+            listOf("/review"),
             slashSuggestions("/rev").map { it.command },
+        )
+        assertEquals(
+            listOf("/refactor"),
+            slashSuggestions("/refa").map { it.command },
         )
         assertEquals(AiCommands.all, slashSuggestions("/"))
     }
