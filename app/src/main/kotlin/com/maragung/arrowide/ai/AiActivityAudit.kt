@@ -75,14 +75,19 @@ class AiActivityAudit(
     }
 
     /** All persisted entries, oldest first; empty when nothing is stored. */
-    fun entries(): List<AiActivityEntry> = try {
-        val file = logFile()
-        if (!file.isFile) return emptyList()
-        synchronized(this) {
-            file.readLines().mapNotNull(::parse)
+    fun entries(): List<AiActivityEntry> {
+        return try {
+            val file = logFile()
+            if (!file.isFile) {
+                emptyList()
+            } else {
+                synchronized(this) {
+                    file.readLines().mapNotNull(::parse)
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
-    } catch (_: Exception) {
-        emptyList()
     }
 
     /** Removes every persisted entry. */

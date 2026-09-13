@@ -402,8 +402,8 @@ fun ArrowIDEApp(
                         GitHubScreen(
                             github = container.githubService,
                             projectsDir = container.workspaceManager.projectsDir,
-                            // Workflow file editing (plan #17): fetch / save
-                            // .github/workflows/* through the contents API.
+                            // Workflow file editing (plan #17): fetch and save
+                            // workflow files through the GitHub contents API.
                             workflowFiles = container.workflowFileService,
                             onProjectCloned = { project ->
                                 container.workspaceManager.setCurrentWorkspace(project)
@@ -413,7 +413,7 @@ fun ArrowIDEApp(
                                 val outcome = container.gitService
                                     .repositoryFor(destDir)
                                     .clone(url, destDir)
-                                outcome is GitOutcome.Ok
+                                outcome is GitOutcome.Ok<*>
                             }
                         )
                     }

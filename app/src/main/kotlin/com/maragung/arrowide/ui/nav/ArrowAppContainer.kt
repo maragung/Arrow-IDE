@@ -222,9 +222,10 @@ class ArrowAppContainer(context: Context) {
     }
 
     /**
-     * Workflow file editing (plan #17): fetch / save `.github/workflows/*`
-     * through the GitHub contents API. Uses its own transport so it can
-     * wrap the request log independently of the main GitHub service.
+     * Workflow file editing (plan #17): fetch and save workflow files under
+     * the .github/workflows directory through the GitHub contents API.
+     * Uses its own transport so it can wrap the request log independently
+     * of the main GitHub service.
      */
     val workflowFileService: WorkflowFileService = WorkflowFileService(
         transport = HttpUrlConnectionTransport(),
